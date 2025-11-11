@@ -9,21 +9,28 @@ import Dashboard from './pages/Dashboard'
 import GeneralSettings from './pages/settings/General'
 import SecuritySettings from './pages/settings/Security'
 
+// RPT Pages
 import RPT1 from './pages/RPT/RPT1/RPT1'
 import RPT2 from './pages/RPT/RPT2/RPT2'
 import RPT3 from './pages/RPT/RPT3/RPT3'
 
+// BUSINESS Pages
 import BUSINESS1 from './pages/BUSINESS/BUSINESS1/BUSINESS1'
 import BUSINESS2 from './pages/BUSINESS/BUSINESS2/BUSINESS2'
 
+// DIGIPAY Pages
 import DIGIPAY1 from './pages/DIGIPAY/DIGIPAY1/DIGIPAY1'
 import DIGIPAY2 from './pages/DIGIPAY/DIGIPAY2/DIGIPAY2'
 
+// TREASURY Pages
 import TREASURY1 from './pages/TREASURY/TREASURY1/TREASURY1'
 import TREASURY2 from './pages/TREASURY/TREASURY2/TREASURY2'
 
-import MARKET1 from './pages/MARKET/MARKET1/MARKET1'
-import MARKET2 from './pages/MARKET/MARKET2/MARKET2'
+// MARKET Pages
+import MapCreator from './pages/MARKET/MapCreator/MapCreator'
+import MarketOutput from './pages/MARKET/MapCreator/MarketOutput'
+import ViewAllMaps from './pages/MARKET/MapCreator/ViewAllMaps'
+import MapEditor from './pages/MARKET/MapCreator/MapEditor'
 
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -53,24 +60,33 @@ function App() {
           />
           <main className="flex-1 overflow-auto p-8 dark:bg-slate-800">
             <Routes>
+              {/* Dashboard */}
               <Route path="/dashboard" element={<Dashboard />} />
-              
-              <Route path="/RPT/RPT1" element={<RPT1 />} />
-              <Route path="/RPT/RPT2" element={<RPT2 />} />
-              <Route path="/RPT/RPT3" element={<RPT3 />} />
 
-              <Route path="/BUSINESS/BUSINESS1" element={<BUSINESS1 />} />
-              <Route path="/BUSINESS/BUSINESS2" element={<BUSINESS2 />} />
+              {/* RPT */}
+              <Route path="/rpt/rpt1" element={<RPT1 />} />
+              <Route path="/rpt/rpt2" element={<RPT2 />} />
+              <Route path="/rpt/rpt3" element={<RPT3 />} />
 
-              <Route path="/TREASURY/TREASURY1" element={<TREASURY1 />} />
-              <Route path="/TREASURY/TREASURY2" element={<TREASURY2 />} />
+              {/* BUSINESS */}
+              <Route path="/business/business1" element={<BUSINESS1 />} />
+              <Route path="/business/business2" element={<BUSINESS2 />} />
 
-              <Route path="/DIGIPAY/DIGIPAY1" element={<DIGIPAY1 />} />
-              <Route path="/DIGIPAY/DIGIPAY2" element={<DIGIPAY2 />} />
+              {/* TREASURY */}
+              <Route path="/treasury/treasury1" element={<TREASURY1 />} />
+              <Route path="/treasury/treasury2" element={<TREASURY2 />} />
 
-              <Route path="/MARKET/MARKET1" element={<MARKET1 />} />
-              <Route path="/MARKET/MARKET2" element={<MARKET2 />} />
+              {/* DIGIPAY */}
+              <Route path="/digipay/digipay1" element={<DIGIPAY1 />} />
+              <Route path="/digipay/digipay2" element={<DIGIPAY2 />} />
 
+              {/* MARKET */}
+              <Route path="/market/mapcreator" element={<MapCreator />} />
+              <Route path="/market/marketoutput/view/:id" element={<MarketOutput />} />
+              <Route path="/market/viewallmaps" element={<ViewAllMaps />} />
+              <Route path="/market/mapeditor/:id" element={<MapEditor />} />
+
+              {/* Settings */}
               <Route path="/settings/general" element={<GeneralSettings />} />
               <Route path="/settings/security" element={<SecuritySettings />} />
             </Routes>
