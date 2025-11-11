@@ -12,7 +12,8 @@ export default function MarketOutput() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  const API_BASE = "http://localhost/revenue/backend/Market/MapCretor";
+  // CORRECTED URL - Fixed typo from MapCretor to MapCreator
+  const API_BASE = "http://localhost/revenue/backend/Market/MapCreator";
 
   console.log("MarketOutput mounted with ID:", id);
 
@@ -66,7 +67,8 @@ export default function MarketOutput() {
       <p>Map ID: {id}</p>
       <button 
         className="back-button"
-        onClick={() => navigate("/Market/MapCretor")}
+        // CORRECTED URL - Fixed typo in navigation
+        onClick={() => navigate("/Market/MapCreator")}
       >
         Back to Market Creator
       </button>
@@ -127,7 +129,8 @@ export default function MarketOutput() {
 
       <button 
         className="back-button"
-        onClick={() => navigate("/Market/MapCretor")}
+        // CORRECTED URL - Fixed typo in navigation
+        onClick={() => navigate("/Market/MapCreator")}
       >
         Back to Market Creator
       </button>

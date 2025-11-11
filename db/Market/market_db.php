@@ -4,7 +4,7 @@
 
 $host = 'localhost';
 $port = 3307;         // your MySQL port from dump
-$dbname = 'market1';
+$dbname = 'market_rent';
 $user = 'root';
 $pass = '';
 

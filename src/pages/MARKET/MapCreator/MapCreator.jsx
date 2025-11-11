@@ -9,9 +9,10 @@ export default function Market1() {
   const [mapImage, setMapImage] = useState(null); // Preview only
   const [mapFile, setMapFile] = useState(null);   // Actual file to upload
   const [isFinished, setIsFinished] = useState(false);
-  const [stallClasses, setStallClasses] = useState([]);
   const [sections, setSections] = useState([]); // All available sections from database
   const [selectedSection, setSelectedSection] = useState("all"); // Filter state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedStallIndex, setSelectedStallIndex] = useState(null);
@@ -20,52 +21,40 @@ export default function Market1() {
   const marketMapRef = useRef(null);
   const modalRef = useRef(null);
   const navigate = useNavigate();
-  const API_BASE = "http://localhost/revenue/backend/Market/MapCretor";
+  
+  // CORRECTED URL - Fixed typo from MapCretor to MapCreator
+  const API_BASE = "http://localhost/revenue/backend/Market/MapCreator";
 
-  // Fetch stall classes and sections from backend
+  // Fetch sections from backend
   useEffect(() => {
-    fetchStallClasses();
     fetchSections();
   }, []);
 
-  const fetchStallClasses = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/get_stall_rights.php`);
-      const data = await res.json();
-      if (data.status === "success") {
-        setStallClasses(data.classes);
-      } else {
-        // Fallback default classes
-        setStallClasses([
-          { class_id: 1, class_name: "A", price: 1000, description: "Premium Location" },
-          { class_id: 2, class_name: "B", price: 750, description: "Standard Location" },
-          { class_id: 3, class_name: "C", price: 500, description: "Economy Location" }
-        ]);
-      }
-    } catch (err) {
-      console.error("Error fetching stall classes:", err);
-      // Fallback if API fails
-      setStallClasses([
-        { class_id: 1, class_name: "A", price: 1000, description: "Premium Location" },
-        { class_id: 2, class_name: "B", price: 750, description: "Standard Location" },
-        { class_id: 3, class_name: "C", price: 500, description: "Economy Location" }
-      ]);
-    }
-  };
-
   const fetchSections = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      console.log('Fetching sections from:', `${API_BASE}/get_sections.php`);
+      
       const res = await fetch(`${API_BASE}/get_sections.php`);
       const data = await res.json();
+      
+      console.log('Sections response:', data);
+      
       if (data.status === "success") {
         setSections(data.sections);
+        console.log('Sections loaded successfully:', data.sections);
       } else {
-        console.error("Failed to fetch sections from database");
+        console.error("Failed to fetch sections from database:", data.message);
         setSections([]);
+        setError("Failed to load sections: " + data.message);
       }
     } catch (err) {
       console.error("Error fetching sections:", err);
       setSections([]);
+      setError("Network error: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,7 +70,6 @@ export default function Market1() {
   // Add a stall
   const addStall = () => {
     const newCount = stallCount + 1;
-    const defaultClass = stallClasses.find(cls => cls.class_name === "C") || stallClasses[0];
     
     setStallCount(newCount);
     setStalls([
@@ -91,13 +79,13 @@ export default function Market1() {
         pos_x: 50, 
         pos_y: 50, 
         status: "available", 
-        class_id: defaultClass.class_id,
-        class_name: defaultClass.class_name,
-        price: defaultClass.price,
+        class_id: 3, // Default to Class C
+        class_name: "C",
+        price: 5000.00, // Default price for Class C
         height: 0, 
         length: 0, 
         width: 0,
-        section_id: null // Use section_id instead of market_section
+        section_id: sections.length > 0 ? sections[0].id : null // Default to first section if available
       }
     ]);
   };
@@ -189,13 +177,17 @@ export default function Market1() {
 
   // Update stall class
   const updateStallClass = (class_id) => {
-    const selectedClass = stallClasses.find(cls => cls.class_id == class_id);
-    if (selectedClass) {
-      const updated = [...stalls];
-      updated[selectedStallIndex].class_id = selectedClass.class_id;
-      updated[selectedStallIndex].class_name = selectedClass.class_name;
-      setStalls(updated);
-    }
+    const updated = [...stalls];
+    const classPrices = {
+      1: 15000.00, // Class A
+      2: 10000.00, // Class B
+      3: 5000.00   // Class C
+    };
+    
+    updated[selectedStallIndex].class_id = parseInt(class_id);
+    updated[selectedStallIndex].class_name = class_id == 1 ? "A" : class_id == 2 ? "B" : "C";
+    updated[selectedStallIndex].price = classPrices[class_id] || 5000.00;
+    setStalls(updated);
   };
 
   // Update price separately
@@ -223,9 +215,41 @@ export default function Market1() {
     return section ? section.name : "No Section";
   };
 
+  // Get stall rights price based on class
+  const getStallRightsPrice = (class_id) => {
+    const prices = {
+      1: 15000.00, // Class A
+      2: 10000.00, // Class B
+      3: 5000.00   // Class C
+    };
+    return prices[class_id] || 5000.00;
+  };
+
+  if (loading) {
+    return (
+      <div className="market-container">
+        <div className="loading">Loading sections...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="market-container">
       <h1>{isFinished ? "Finished Market Map" : "Market Map Creator"}</h1>
+
+      {error && (
+        <div className="error-banner">
+          <div className="error-content">
+            <span className="error-icon">⚠️</span>
+            <div className="error-message">
+              <strong>Error:</strong> {error}
+            </div>
+            <button onClick={fetchSections} className="retry-btn">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {!isFinished && (
         <div className="upload-form">
@@ -258,6 +282,13 @@ export default function Market1() {
         </div>
       )}
 
+      {/* Debug info for sections */}
+      {sections.length === 0 && !loading && (
+        <div className="debug-info">
+          No sections loaded. Check if the PHP file exists and returns valid JSON.
+        </div>
+      )}
+
       <div
         id="marketMap"
         ref={marketMapRef}
@@ -277,7 +308,7 @@ export default function Market1() {
               <div className="stall-content">
                 <div className="stall-name">{stall.name}</div>
                 <div className="stall-class">Class: {stall.class_name}</div>
-                <div className="stall-price">₱{stall.price}</div>
+                <div className="stall-price">₱{stall.price.toLocaleString()}</div>
                 <div className="stall-size">{stall.length}m × {stall.width}m × {stall.height}m</div>
                 {stall.section_id && (
                   <div className="stall-section">Section: {getSectionName(stall.section_id)}</div>
@@ -328,17 +359,15 @@ export default function Market1() {
               value={stalls[selectedStallIndex]?.class_id || ""}
               onChange={(e) => updateStallClass(e.target.value)}
             >
-              {stallClasses.map((cls) => (
-                <option key={cls.class_id} value={cls.class_id}>
-                  Class {cls.class_name} - ₱{cls.price} ({cls.description})
-                </option>
-              ))}
+              <option value="1">Class A - ₱15,000.00 (Premium Location)</option>
+              <option value="2">Class B - ₱10,000.00 (Standard Location)</option>
+              <option value="3">Class C - ₱5,000.00 (Economy Location)</option>
             </select>
 
             <div className="current-class-info">
               <strong>Selected: Class {stalls[selectedStallIndex]?.class_name}</strong>
               <br />
-              <span>Stall Rights: ₱{stallClasses.find(cls => cls.class_id == stalls[selectedStallIndex]?.class_id)?.price || 0}</span>
+              <span>Stall Rights: ₱{getStallRightsPrice(stalls[selectedStallIndex]?.class_id).toLocaleString()}</span>
             </div>
 
             <label>Custom Price (₱)</label>
@@ -399,6 +428,7 @@ export default function Market1() {
           <button onClick={addStall} disabled={!mapImage}>Add Stall</button>
           <button onClick={saveStalls} disabled={!mapFile}>Save Stalls</button>
           <button onClick={() => navigate("/Market/ViewAllMaps")}>View All Maps</button>
+          <button onClick={fetchSections}>Refresh Sections</button>
         </div>
       )}
     </div>

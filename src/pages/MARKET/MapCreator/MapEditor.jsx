@@ -23,7 +23,9 @@ export default function MapEditor() {
 
   const marketMapRef = useRef(null);
   const modalRef = useRef(null);
-  const API_BASE = "http://localhost/revenue/backend/Market/MapCretor";
+  
+  // CORRECTED URL - Fixed typo from MapCretor to MapCreator
+  const API_BASE = "http://localhost/revenue/backend/Market/MapCreator";
 
   // Fetch map, stalls, stall classes, and sections data
   useEffect(() => {
@@ -34,10 +36,13 @@ export default function MapEditor() {
 
   const fetchMapData = async () => {
     try {
+      console.log('Fetching map data from:', `${API_BASE}/map_display.php?map_id=${id}`);
       const res = await fetch(`${API_BASE}/map_display.php?map_id=${id}`);
       if (!res.ok) throw new Error(`Network error: ${res.status}`);
       
       const data = await res.json();
+      console.log('Map data response:', data);
+      
       if (data.status === "success") {
         setMapData(data.map);
         setStalls(data.stalls || []);
@@ -46,6 +51,7 @@ export default function MapEditor() {
         throw new Error(data.message || "Failed to fetch map data");
       }
     } catch (err) {
+      console.error('Error fetching map data:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -54,8 +60,11 @@ export default function MapEditor() {
 
   const fetchStallClasses = async () => {
     try {
+      console.log('Fetching stall classes from:', `${API_BASE}/get_stall_rights.php`);
       const res = await fetch(`${API_BASE}/get_stall_rights.php`);
       const data = await res.json();
+      console.log('Stall classes response:', data);
+      
       if (data.status === "success") {
         setStallClasses(data.classes);
       } else {
@@ -70,8 +79,11 @@ export default function MapEditor() {
 
   const fetchSections = async () => {
     try {
+      console.log('Fetching sections from:', `${API_BASE}/get_sections.php`);
       const res = await fetch(`${API_BASE}/get_sections.php`);
       const data = await res.json();
+      console.log('Sections response:', data);
+      
       if (data.status === "success") {
         setSections(data.sections);
       } else {
@@ -104,7 +116,7 @@ export default function MapEditor() {
         height: 0, 
         length: 0, 
         width: 0,
-        section_id: null, // Use section_id instead of market_section
+        section_id: sections.length > 0 ? sections[0].id : null, // Default to first section
         isNew: true
       }
     ]);
@@ -161,6 +173,7 @@ export default function MapEditor() {
   // Save updates to backend
   const saveUpdates = async () => {
     try {
+      console.log('Saving updates to:', `${API_BASE}/update_map.php`);
       const res = await fetch(`${API_BASE}/update_map.php`, {
         method: "POST",
         headers: {
@@ -239,6 +252,7 @@ export default function MapEditor() {
       const updated = [...stalls];
       updated[selectedStallIndex].class_id = selectedClass.class_id;
       updated[selectedStallIndex].class_name = selectedClass.class_name;
+      updated[selectedStallIndex].price = selectedClass.price; // Update price to match class
       setStalls(updated);
     }
   };
@@ -316,6 +330,11 @@ export default function MapEditor() {
         </p>
       </div>
 
+      {/* Debug Info */}
+      <div className="debug-info">
+        <p>Map ID: {id} | Stalls: {stalls.length} | Sections: {sections.length} | Classes: {stallClasses.length}</p>
+      </div>
+
       {/* Market Section Filter */}
       {stalls.length > 0 && sections.length > 0 && (
         <div className="section-filter">
@@ -362,7 +381,7 @@ export default function MapEditor() {
               <div className="stall-content">
                 <div className="stall-name">{stall.name}</div>
                 <div className="stall-class">Class: {stall.class_name}</div>
-                <div className="stall-price">₱{stall.price}</div>
+                <div className="stall-price">₱{stall.price?.toLocaleString()}</div>
                 <div className="stall-size">{stall.length}m × {stall.width}m × {stall.height}m</div>
                 {stall.section_id && (
                   <div className="stall-section">Section: {getSectionName(stall.section_id)}</div>
@@ -392,6 +411,7 @@ export default function MapEditor() {
       <div className="controls">
         <button onClick={addStall} className="btn-add">Add New Stall</button>
         <button onClick={saveUpdates} className="btn-save">Save Changes</button>
+        <button onClick={fetchMapData} className="btn-refresh">Refresh Data</button>
       </div>
 
       {modalOpen && (
@@ -426,7 +446,7 @@ export default function MapEditor() {
               <option value="">Select a class...</option>
               {stallClasses.map((cls) => (
                 <option key={cls.class_id} value={cls.class_id}>
-                  Class {cls.class_name} - ₱{cls.price} ({cls.description})
+                  Class {cls.class_name} - ₱{cls.price?.toLocaleString()} ({cls.description})
                 </option>
               ))}
             </select>
@@ -434,7 +454,7 @@ export default function MapEditor() {
             <div className="current-class-info">
               <strong>Selected: Class {stalls[selectedStallIndex]?.class_name || "None"}</strong>
               <br />
-              <span>Stall Rights: ₱{stallClasses.find(cls => cls.class_id == stalls[selectedStallIndex]?.class_id)?.price || 0}</span>
+              <span>Stall Rights: ₱{stallClasses.find(cls => cls.class_id == stalls[selectedStallIndex]?.class_id)?.price?.toLocaleString() || 0}</span>
             </div>
 
             <label>Custom Price (₱)</label>
