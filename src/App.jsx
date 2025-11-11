@@ -31,6 +31,7 @@ import MapCreator from './pages/MARKET/MapCreator/MapCreator'
 import MarketOutput from './pages/MARKET/MapCreator/MarketOutput'
 import ViewAllMaps from './pages/MARKET/MapCreator/ViewAllMaps'
 import MapEditor from './pages/MARKET/MapCreator/MapEditor'
+import MarketConfig from './pages/MARKET/MapCreator/MarketConfig'
 
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -85,6 +86,7 @@ function App() {
               <Route path="/market/marketoutput/view/:id" element={<MarketOutput />} />
               <Route path="/market/viewallmaps" element={<ViewAllMaps />} />
               <Route path="/market/mapeditor/:id" element={<MapEditor />} />
+              <Route path="/Market/Config" element={<MarketConfig />} />
 
               {/* Settings */}
               <Route path="/settings/general" element={<GeneralSettings />} />

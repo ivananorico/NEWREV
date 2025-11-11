@@ -429,6 +429,14 @@ export default function Market1() {
           <button onClick={saveStalls} disabled={!mapFile}>Save Stalls</button>
           <button onClick={() => navigate("/Market/ViewAllMaps")}>View All Maps</button>
           <button onClick={fetchSections}>Refresh Sections</button>
+          {/* ADDED CONFIGURATION BUTTON */}
+          <button 
+            onClick={() => navigate("/Market/Config")}
+            className="config-btn"
+            title="Configure stall rights and sections"
+          >
+            ⚙️ Configuration
+          </button>
         </div>
       )}
     </div>

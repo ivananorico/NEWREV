@@ -470,3 +470,35 @@ input[list] {
   border-radius: 3px;
   display: inline-block;
 }
+/* Add to your existing MapCreator.css */
+
+.config-btn {
+  background: linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.config-btn:hover {
+  background: linear-gradient(135deg, #7b1fa2 0%, #ab47bc 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4);
+}
+
+/* Make sure the controls layout works well with the new button */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.controls button {
+  margin: 5px;
+}
