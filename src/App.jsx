@@ -15,7 +15,7 @@ import RPT2 from './pages/RPT/RPT2/RPT2'
 import RPT3 from './pages/RPT/RPT3/RPT3'
 
 // BUSINESS Pages
-import BUSINESS1 from './pages/BUSINESS/BUSINESS1/BUSINESS1'
+import BusinessTaxConfig from './pages/BUSINESS/BusinessTaxConfig/BusinessTaxConfig'
 import BUSINESS2 from './pages/BUSINESS/BUSINESS2/BUSINESS2'
 
 // DIGIPAY Pages
@@ -70,7 +70,7 @@ function App() {
               <Route path="/rpt/rpt3" element={<RPT3 />} />
 
               {/* BUSINESS */}
-              <Route path="/business/business1" element={<BUSINESS1 />} />
+              <Route path="/business/businesstaxconfig" element={<BusinessTaxConfig />} />
               <Route path="/business/business2" element={<BUSINESS2 />} />
 
               {/* TREASURY */}
