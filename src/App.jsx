@@ -10,7 +10,7 @@ import GeneralSettings from './pages/settings/General'
 import SecuritySettings from './pages/settings/Security'
 
 // RPT Pages
-import RPT1 from './pages/RPT/RPT1/RPT1'
+import RPTConfig from './pages/RPT/RPTConfig/RPTConfig'
 import RPT2 from './pages/RPT/RPT2/RPT2'
 import RPT3 from './pages/RPT/RPT3/RPT3'
 
@@ -65,7 +65,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
 
               {/* RPT */}
-              <Route path="/rpt/rpt1" element={<RPT1 />} />
+              <Route path="/rpt/rptconfig" element={<RPTConfig />} />
               <Route path="/rpt/rpt2" element={<RPT2 />} />
               <Route path="/rpt/rpt3" element={<RPT3 />} />
 

@@ -12,7 +12,7 @@ const sidebarItems = [
     label: "Real Property Tax Collection System",
     icon: LayoutDashboard,
     subItems: [
-      { id: "rpt1", label: "RPT1", path: "/RPT/RPT1" },
+      { id: "rpt1", label: "RPT Configuration", path: "/RPT/RPTConfig" },
       { id: "rpt2", label: "RPT2", path: "/RPT/RPT2" },
       { id: "rpt3", label: "RPT3", path: "/RPT/RPT3" },
     ]
