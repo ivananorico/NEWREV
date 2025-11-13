@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 
 export default function RPTConfig() {
-  const [activeTab, setActiveTab] = useState('land'); // 'land' or 'property'
+  const [activeTab, setActiveTab] = useState('land');
   const [landConfigurations, setLandConfigurations] = useState([]);
   const [propertyConfigurations, setPropertyConfigurations] = useState([]);
+  const [taxConfigurations, setTaxConfigurations] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,10 +18,10 @@ export default function RPTConfig() {
     effective_date: '',
     expiration_date: '',
     status: 'active',
-    vicinity: 'General Area' // Added vicinity field
+    vicinity: 'General Area'
   });
 
-  // Combined Property Configuration Form
+  // Property Configuration Form
   const [propertyFormData, setPropertyFormData] = useState({
     classification: '',
     material_type: '',
@@ -34,8 +35,17 @@ export default function RPTConfig() {
     status: 'active'
   });
 
+  // Tax Configuration Form
+  const [taxFormData, setTaxFormData] = useState({
+    tax_name: '',
+    tax_percent: '',
+    effective_date: '',
+    expiration_date: '',
+    status: 'active'
+  });
+
   const [editingId, setEditingId] = useState(null);
-  const [editingType, setEditingType] = useState(null); // 'land' or 'property'
+  const [editingType, setEditingType] = useState(null);
 
   const API_BASE = "http://localhost/revenue/backend/RPT/RPTConfig";
 
@@ -76,9 +86,28 @@ export default function RPTConfig() {
     }
   };
 
+  const fetchTaxConfigurations = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/tax-configurations.php?current_date=${currentDate}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setTaxConfigurations(data);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching tax configurations:', error);
+      setError('Failed to load tax configurations: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchLandConfigurations();
     fetchPropertyConfigurations();
+    fetchTaxConfigurations();
   }, [currentDate]);
 
   // Land Configuration Handlers
@@ -123,7 +152,7 @@ export default function RPTConfig() {
       effective_date: config.effective_date,
       expiration_date: config.expiration_date || '',
       status: config.status,
-      vicinity: config.vicinity || 'General Area' // Added vicinity field
+      vicinity: config.vicinity || 'General Area'
     });
     setEditingId(config.id);
     setEditingType('land');
@@ -179,9 +208,55 @@ export default function RPTConfig() {
     setEditingType('property');
   };
 
+  // Tax Configuration Handlers
+  const handleTaxSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingId 
+      ? `${API_BASE}/tax-configurations.php?id=${editingId}`
+      : `${API_BASE}/tax-configurations.php`;
+    
+    const method = editingId ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taxFormData)
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        fetchTaxConfigurations();
+        resetTaxForm();
+        alert(editingId ? 'Tax configuration updated successfully!' : 'Tax configuration created successfully!');
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error saving tax configuration:', error);
+      alert('Error saving tax configuration');
+    }
+  };
+
+  const handleTaxEdit = (config) => {
+    setTaxFormData({
+      tax_name: config.tax_name,
+      tax_percent: config.tax_percent,
+      effective_date: config.effective_date,
+      expiration_date: config.expiration_date || '',
+      status: config.status
+    });
+    setEditingId(config.id);
+    setEditingType('tax');
+  };
+
   // Common Handlers
   const handleDelete = async (id, type) => {
-    if (window.confirm(`Are you sure you want to delete this ${type} configuration?`)) {
+    const typeName = type.replace('-configurations', '').replace('-', ' ');
+    if (window.confirm(`Are you sure you want to delete this ${typeName} configuration?`)) {
       try {
         const response = await fetch(`${API_BASE}/${type}.php?id=${id}`, {
           method: 'DELETE'
@@ -190,10 +265,12 @@ export default function RPTConfig() {
         if (response.ok) {
           if (type === 'land-configurations') {
             fetchLandConfigurations();
-          } else {
+          } else if (type === 'property-configurations') {
             fetchPropertyConfigurations();
+          } else if (type === 'tax-configurations') {
+            fetchTaxConfigurations();
           }
-          alert(`${type.replace('-', ' ')} deleted successfully!`);
+          alert(`${typeName} configuration deleted successfully!`);
         }
       } catch (error) {
         console.error(`Error deleting ${type}:`, error);
@@ -203,7 +280,8 @@ export default function RPTConfig() {
   };
 
   const handleExpire = async (id, type) => {
-    if (window.confirm(`Are you sure you want to expire this ${type}?`)) {
+    const typeName = type.replace('-configurations', '').replace('-', ' ');
+    if (window.confirm(`Are you sure you want to expire this ${typeName}?`)) {
       try {
         const response = await fetch(`${API_BASE}/${type}.php?id=${id}`, {
           method: 'PATCH',
@@ -219,10 +297,12 @@ export default function RPTConfig() {
         if (response.ok) {
           if (type === 'land-configurations') {
             fetchLandConfigurations();
-          } else {
+          } else if (type === 'property-configurations') {
             fetchPropertyConfigurations();
+          } else if (type === 'tax-configurations') {
+            fetchTaxConfigurations();
           }
-          alert(`${type.replace('-', ' ')} expired successfully!`);
+          alert(`${typeName} configuration expired successfully!`);
         }
       } catch (error) {
         console.error(`Error expiring ${type}:`, error);
@@ -240,7 +320,7 @@ export default function RPTConfig() {
       effective_date: '',
       expiration_date: '',
       status: 'active',
-      vicinity: 'General Area' // Added vicinity field
+      vicinity: 'General Area'
     });
     setEditingId(null);
     setEditingType(null);
@@ -263,6 +343,18 @@ export default function RPTConfig() {
     setEditingType(null);
   };
 
+  const resetTaxForm = () => {
+    setTaxFormData({
+      tax_name: '',
+      tax_percent: '',
+      effective_date: '',
+      expiration_date: '',
+      status: 'active'
+    });
+    setEditingId(null);
+    setEditingType(null);
+  };
+
   // Calculations
   const calculateLandAssessedValue = () => {
     const marketValue = parseFloat(landFormData.market_value) || 0;
@@ -275,10 +367,8 @@ export default function RPTConfig() {
   const expiredLandConfigs = landConfigurations.filter(config => config.status === 'expired').length;
   const activePropertyConfigs = propertyConfigurations.filter(config => config.status === 'active').length;
   const expiredPropertyConfigs = propertyConfigurations.filter(config => config.status === 'expired').length;
-
-  // Get unique classifications for reference
-  const landClassifications = [...new Set(landConfigurations.map(config => config.classification))];
-  const propertyClassifications = [...new Set(propertyConfigurations.map(config => config.classification))];
+  const activeTaxConfigs = taxConfigurations.filter(config => config.status === 'active').length;
+  const expiredTaxConfigs = taxConfigurations.filter(config => config.status === 'expired').length;
 
   return (
     <div className='mx-1 mt-1 p-6 dark:bg-slate-900 bg-white dark:text-slate-300 rounded-lg'>
@@ -323,6 +413,16 @@ export default function RPTConfig() {
           >
             Property Configurations
           </button>
+          <button
+            onClick={() => setActiveTab('tax')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'tax'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+            }`}
+          >
+            Tax Configurations
+          </button>
         </nav>
       </div>
 
@@ -341,7 +441,7 @@ export default function RPTConfig() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-blue-800 dark:text-blue-300">Land Configs</h3>
           <p className="text-2xl font-bold">{landConfigurations.length}</p>
@@ -352,9 +452,14 @@ export default function RPTConfig() {
           <p className="text-2xl font-bold">{propertyConfigurations.length}</p>
           <p className="text-sm">Active: {activePropertyConfigs} | Expired: {expiredPropertyConfigs}</p>
         </div>
+        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+          <h3 className="font-semibold text-purple-800 dark:text-purple-300">Tax Configs</h3>
+          <p className="text-2xl font-bold">{taxConfigurations.length}</p>
+          <p className="text-sm">Active: {activeTaxConfigs} | Expired: {expiredTaxConfigs}</p>
+        </div>
         <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-orange-800 dark:text-orange-300">Active Total</h3>
-          <p className="text-2xl font-bold">{activeLandConfigs + activePropertyConfigs}</p>
+          <p className="text-2xl font-bold">{activeLandConfigs + activePropertyConfigs + activeTaxConfigs}</p>
         </div>
       </div>
 
@@ -845,6 +950,193 @@ export default function RPTConfig() {
                             )}
                             <button
                               onClick={() => handleDelete(config.id, 'property-configurations')}
+                              className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Tax Configuration Tab */}
+      {activeTab === 'tax' && !loading && (
+        <>
+          {/* Tax Form Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">
+              {editingType === 'tax' ? 'Edit Tax Configuration' : 'Add New Tax Configuration'}
+            </h2>
+            <form onSubmit={handleTaxSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Tax Name *</label>
+                <input
+                  type="text"
+                  value={taxFormData.tax_name}
+                  onChange={(e) => setTaxFormData({...taxFormData, tax_name: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="e.g., RPT, Special Tax, Penalty, Interest"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter any tax name you want to create</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Tax Percentage (%) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={taxFormData.tax_percent}
+                  onChange={(e) => setTaxFormData({...taxFormData, tax_percent: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="0.00"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter percentage (e.g., 1.00 for 1%)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select
+                  value={taxFormData.status}
+                  onChange={(e) => setTaxFormData({...taxFormData, status: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                >
+                  <option value="active">Active</option>
+                  <option value="expired">Expired</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Effective Date *</label>
+                <input
+                  type="date"
+                  value={taxFormData.effective_date}
+                  onChange={(e) => setTaxFormData({...taxFormData, effective_date: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Expiration Date</label>
+                <input
+                  type="date"
+                  value={taxFormData.expiration_date}
+                  onChange={(e) => setTaxFormData({...taxFormData, expiration_date: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
+              </div>
+
+              {/* Tax Calculation Preview */}
+              {taxFormData.tax_percent && (
+                <div className="md:col-span-2 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <h4 className="font-medium mb-2">Tax Rate Preview</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Tax Type:</span>
+                      <div className="text-lg">{taxFormData.tax_name}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Tax Rate:</span>
+                      <div className="text-lg">{taxFormData.tax_percent}%</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tax Form Actions */}
+              <div className="md:col-span-2 flex gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                >
+                  {editingType === 'tax' ? 'Update Tax Configuration' : 'Create Tax Configuration'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetTaxForm}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Tax Configurations List */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">
+              Tax Configurations ({taxConfigurations.length})
+            </h2>
+            
+            {taxConfigurations.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No tax configurations found for the selected date.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300 dark:border-slate-700">
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-slate-800">
+                      <th className="border p-2 text-left">Tax Name</th>
+                      <th className="border p-2 text-left">Tax Percentage</th>
+                      <th className="border p-2 text-left">Effective Date</th>
+                      <th className="border p-2 text-left">Expiration Date</th>
+                      <th className="border p-2 text-left">Status</th>
+                      <th className="border p-2 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {taxConfigurations.map((config) => (
+                      <tr 
+                        key={config.id} 
+                        className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${
+                          config.status === 'expired' ? 'bg-gray-50 dark:bg-slate-800/50 text-gray-500' : ''
+                        }`}
+                      >
+                        <td className="border p-2 font-medium">{config.tax_name}</td>
+                        <td className="border p-2">{config.tax_percent}%</td>
+                        <td className="border p-2">{config.effective_date}</td>
+                        <td className="border p-2">{config.expiration_date || '-'}</td>
+                        <td className="border p-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            config.status === 'active' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {config.status}
+                          </span>
+                        </td>
+                        <td className="border p-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleTaxEdit(config)}
+                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
+                              disabled={config.status === 'expired'}
+                            >
+                              Edit
+                            </button>
+                            {config.status === 'active' && (
+                              <button
+                                onClick={() => handleExpire(config.id, 'tax-configurations')}
+                                className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                              >
+                                Expire
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(config.id, 'tax-configurations')}
                               className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
                             >
                               Delete
