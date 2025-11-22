@@ -19,36 +19,36 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        getBusinessConfigurations();
+        getDiscountConfigurations();
         break;
     case 'POST':
-        createBusinessConfiguration();
+        createDiscountConfiguration();
         break;
     case 'PUT':
-        updateBusinessConfiguration();
+        updateDiscountConfiguration();
         break;
     case 'PATCH':
-        patchBusinessConfiguration();
+        patchDiscountConfiguration();
         break;
     case 'DELETE':
-        deleteBusinessConfiguration();
+        deleteDiscountConfiguration();
         break;
     default:
         http_response_code(405);
         echo json_encode(["error" => "Method not allowed"]);
 }
 
-function getBusinessConfigurations() {
+function getDiscountConfigurations() {
     global $pdo;
     
     $currentDate = isset($_GET['current_date']) ? $_GET['current_date'] : date('Y-m-d');
     
     try {
         $stmt = $pdo->prepare("
-            SELECT * FROM business_tax_rate_config 
+            SELECT * FROM business_discount_config 
             WHERE effective_date <= ? 
             AND (expiration_date IS NULL OR expiration_date >= ?)
-            ORDER BY business_type, effective_date
+            ORDER BY effective_date DESC, created_at DESC
         ");
         $stmt->execute([$currentDate, $currentDate]);
         $configurations = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -61,7 +61,7 @@ function getBusinessConfigurations() {
     }
 }
 
-function createBusinessConfiguration() {
+function createDiscountConfiguration() {
     global $pdo;
     
     $input = json_decode(file_get_contents('php://input'), true);
@@ -72,8 +72,8 @@ function createBusinessConfiguration() {
         return;
     }
     
-    // Validate required fields based on actual database schema
-    $required = ['business_type', 'tax_rate', 'effective_date'];
+    // Validate required fields
+    $required = ['discount_percent', 'effective_date'];
     foreach ($required as $field) {
         if (!isset($input[$field])) {
             http_response_code(400);
@@ -84,31 +84,30 @@ function createBusinessConfiguration() {
     
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO business_tax_rate_config (
-                business_type, tax_rate, effective_date, expiration_date, remarks
-            ) VALUES (?, ?, ?, ?, ?)
+            INSERT INTO business_discount_config (
+                discount_percent, effective_date, expiration_date, remarks
+            ) VALUES (?, ?, ?, ?)
         ");
         
         $stmt->execute([
-            $input['business_type'],
-            $input['tax_rate'],
+            $input['discount_percent'],
             $input['effective_date'],
             !empty($input['expiration_date']) ? $input['expiration_date'] : null,
             !empty($input['remarks']) ? $input['remarks'] : null
         ]);
         
         echo json_encode([
-            "message" => "Business configuration created successfully", 
+            "message" => "Discount configuration created successfully", 
             "id" => $pdo->lastInsertId()
         ]);
         
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to create business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to create discount configuration: " . $e->getMessage()]);
     }
 }
 
-function updateBusinessConfiguration() {
+function updateDiscountConfiguration() {
     global $pdo;
     
     $id = $_GET['id'] ?? null;
@@ -128,15 +127,13 @@ function updateBusinessConfiguration() {
     
     try {
         $stmt = $pdo->prepare("
-            UPDATE business_tax_rate_config SET 
-                business_type = ?, tax_rate = ?, 
-                effective_date = ?, expiration_date = ?, remarks = ?
+            UPDATE business_discount_config SET 
+                discount_percent = ?, effective_date = ?, expiration_date = ?, remarks = ?
             WHERE id = ?
         ");
         
         $stmt->execute([
-            $input['business_type'],
-            $input['tax_rate'],
+            $input['discount_percent'],
             $input['effective_date'],
             !empty($input['expiration_date']) ? $input['expiration_date'] : null,
             !empty($input['remarks']) ? $input['remarks'] : null,
@@ -144,19 +141,19 @@ function updateBusinessConfiguration() {
         ]);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration updated successfully"]);
+            echo json_encode(["message" => "Discount configuration updated successfully"]);
         } else {
             http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+            echo json_encode(["error" => "Discount configuration not found"]);
         }
         
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to update business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to update discount configuration: " . $e->getMessage()]);
     }
 }
 
-function patchBusinessConfiguration() {
+function patchDiscountConfiguration() {
     global $pdo;
     
     $id = $_GET['id'] ?? null;
@@ -177,8 +174,7 @@ function patchBusinessConfiguration() {
     $fields = [];
     $values = [];
     
-    // Only allow fields that exist in the database
-    $allowedFields = ['business_type', 'tax_rate', 'effective_date', 'expiration_date', 'remarks'];
+    $allowedFields = ['expiration_date', 'remarks'];
     foreach ($allowedFields as $field) {
         if (isset($input[$field])) {
             $fields[] = "$field = ?";
@@ -193,25 +189,25 @@ function patchBusinessConfiguration() {
     }
     
     $values[] = $id;
-    $sql = "UPDATE business_tax_rate_config SET " . implode(', ', $fields) . " WHERE id = ?";
+    $sql = "UPDATE business_discount_config SET " . implode(', ', $fields) . " WHERE id = ?";
     
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($values);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration updated successfully"]);
+            echo json_encode(["message" => "Discount configuration updated successfully"]);
         } else {
             http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+            echo json_encode(["error" => "Discount configuration not found"]);
         }
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to update business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to update discount configuration: " . $e->getMessage()]);
     }
 }
 
-function deleteBusinessConfiguration() {
+function deleteDiscountConfiguration() {
     global $pdo;
     
     $id = $_GET['id'] ?? null;
@@ -222,18 +218,18 @@ function deleteBusinessConfiguration() {
     }
     
     try {
-        $stmt = $pdo->prepare("DELETE FROM business_tax_rate_config WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM business_discount_config WHERE id = ?");
         $stmt->execute([$id]);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration deleted successfully"]);
+            echo json_encode(["message" => "Discount configuration deleted successfully"]);
         } else {
             http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+            echo json_encode(["error" => "Discount configuration not found"]);
         }
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to delete business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to delete discount configuration: " . $e->getMessage()]);
     }
 }
 ?>

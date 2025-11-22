@@ -13,55 +13,54 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 }
 
 // Include database connection
-require_once '../../../db/Business/business_db.php';
+require_once '../../../db/RPT/rpt_db.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        getBusinessConfigurations();
+        getPenaltyConfigurations();
         break;
     case 'POST':
-        createBusinessConfiguration();
+        createPenaltyConfiguration();
         break;
     case 'PUT':
-        updateBusinessConfiguration();
+        updatePenaltyConfiguration();
         break;
     case 'PATCH':
-        patchBusinessConfiguration();
+        patchPenaltyConfiguration();
         break;
     case 'DELETE':
-        deleteBusinessConfiguration();
+        deletePenaltyConfiguration();
         break;
     default:
         http_response_code(405);
         echo json_encode(["error" => "Method not allowed"]);
 }
 
-function getBusinessConfigurations() {
+function getPenaltyConfigurations() {
     global $pdo;
     
     $currentDate = isset($_GET['current_date']) ? $_GET['current_date'] : date('Y-m-d');
     
     try {
         $stmt = $pdo->prepare("
-            SELECT * FROM business_tax_rate_config 
+            SELECT * FROM penalty_configurations 
             WHERE effective_date <= ? 
-            AND (expiration_date IS NULL OR expiration_date >= ?)
-            ORDER BY business_type, effective_date
+            AND (expiration_date IS NULL OR expiration_date >= ? OR status = 'expired')
+            ORDER BY status ASC, effective_date DESC
         ");
         $stmt->execute([$currentDate, $currentDate]);
         $configurations = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode($configurations);
-        
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(["error" => "Database error: " . $e->getMessage()]);
     }
 }
 
-function createBusinessConfiguration() {
+function createPenaltyConfiguration() {
     global $pdo;
     
     $input = json_decode(file_get_contents('php://input'), true);
@@ -72,43 +71,56 @@ function createBusinessConfiguration() {
         return;
     }
     
-    // Validate required fields based on actual database schema
-    $required = ['business_type', 'tax_rate', 'effective_date'];
-    foreach ($required as $field) {
-        if (!isset($input[$field])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Missing required field: $field"]);
-            return;
-        }
+    // Validate required fields
+    if (!isset($input['penalty_percent']) || !isset($input['effective_date'])) {
+        http_response_code(400);
+        echo json_encode(["error" => "Missing required fields: penalty_percent and effective_date are required"]);
+        return;
     }
     
+    // Check for overlapping active configurations
     try {
+        $checkStmt = $pdo->prepare("
+            SELECT id FROM penalty_configurations 
+            WHERE status = 'active'
+            AND effective_date <= ? 
+            AND (expiration_date IS NULL OR expiration_date >= ?)
+        ");
+        $checkStmt->execute([
+            $input['effective_date'],
+            $input['effective_date']
+        ]);
+        
+        if ($checkStmt->rowCount() > 0) {
+            http_response_code(400);
+            echo json_encode(["error" => "Active penalty configuration already exists for the selected date"]);
+            return;
+        }
+        
         $stmt = $pdo->prepare("
-            INSERT INTO business_tax_rate_config (
-                business_type, tax_rate, effective_date, expiration_date, remarks
-            ) VALUES (?, ?, ?, ?, ?)
+            INSERT INTO penalty_configurations (
+                penalty_percent, effective_date, expiration_date, status
+            ) VALUES (?, ?, ?, ?)
         ");
         
         $stmt->execute([
-            $input['business_type'],
-            $input['tax_rate'],
+            $input['penalty_percent'],
             $input['effective_date'],
             !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            !empty($input['remarks']) ? $input['remarks'] : null
+            $input['status'] ?? 'active'
         ]);
         
         echo json_encode([
-            "message" => "Business configuration created successfully", 
+            "message" => "Penalty configuration created successfully", 
             "id" => $pdo->lastInsertId()
         ]);
-        
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to create business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to create penalty configuration: " . $e->getMessage()]);
     }
 }
 
-function updateBusinessConfiguration() {
+function updatePenaltyConfiguration() {
     global $pdo;
     
     $id = $_GET['id'] ?? null;
@@ -126,37 +138,54 @@ function updateBusinessConfiguration() {
         return;
     }
     
+    // Check for overlapping active configurations (excluding current record)
     try {
+        $checkStmt = $pdo->prepare("
+            SELECT id FROM penalty_configurations 
+            WHERE status = 'active'
+            AND effective_date <= ? 
+            AND (expiration_date IS NULL OR expiration_date >= ?)
+            AND id != ?
+        ");
+        $checkStmt->execute([
+            $input['effective_date'],
+            $input['effective_date'],
+            $id
+        ]);
+        
+        if ($checkStmt->rowCount() > 0) {
+            http_response_code(400);
+            echo json_encode(["error" => "Active penalty configuration already exists for the selected date"]);
+            return;
+        }
+        
         $stmt = $pdo->prepare("
-            UPDATE business_tax_rate_config SET 
-                business_type = ?, tax_rate = ?, 
-                effective_date = ?, expiration_date = ?, remarks = ?
+            UPDATE penalty_configurations SET 
+                penalty_percent = ?, effective_date = ?, expiration_date = ?, status = ?
             WHERE id = ?
         ");
         
         $stmt->execute([
-            $input['business_type'],
-            $input['tax_rate'],
+            $input['penalty_percent'],
             $input['effective_date'],
             !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            !empty($input['remarks']) ? $input['remarks'] : null,
+            $input['status'] ?? 'active',
             $id
         ]);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration updated successfully"]);
+            echo json_encode(["message" => "Penalty configuration updated successfully"]);
         } else {
             http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+            echo json_encode(["error" => "Penalty configuration not found"]);
         }
-        
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to update business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to update penalty configuration: " . $e->getMessage()]);
     }
 }
 
-function patchBusinessConfiguration() {
+function patchPenaltyConfiguration() {
     global $pdo;
     
     $id = $_GET['id'] ?? null;
@@ -174,11 +203,11 @@ function patchBusinessConfiguration() {
         return;
     }
     
+    // Build dynamic update query
     $fields = [];
     $values = [];
     
-    // Only allow fields that exist in the database
-    $allowedFields = ['business_type', 'tax_rate', 'effective_date', 'expiration_date', 'remarks'];
+    $allowedFields = ['status', 'expiration_date', 'penalty_percent'];
     foreach ($allowedFields as $field) {
         if (isset($input[$field])) {
             $fields[] = "$field = ?";
@@ -193,25 +222,25 @@ function patchBusinessConfiguration() {
     }
     
     $values[] = $id;
-    $sql = "UPDATE business_tax_rate_config SET " . implode(', ', $fields) . " WHERE id = ?";
+    $sql = "UPDATE penalty_configurations SET " . implode(', ', $fields) . " WHERE id = ?";
     
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($values);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration updated successfully"]);
+            echo json_encode(["message" => "Penalty configuration updated successfully"]);
         } else {
             http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+            echo json_encode(["error" => "Penalty configuration not found"]);
         }
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to update business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to update penalty configuration: " . $e->getMessage()]);
     }
 }
 
-function deleteBusinessConfiguration() {
+function deletePenaltyConfiguration() {
     global $pdo;
     
     $id = $_GET['id'] ?? null;
@@ -222,18 +251,18 @@ function deleteBusinessConfiguration() {
     }
     
     try {
-        $stmt = $pdo->prepare("DELETE FROM business_tax_rate_config WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM penalty_configurations WHERE id = ?");
         $stmt->execute([$id]);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration deleted successfully"]);
+            echo json_encode(["message" => "Penalty configuration deleted successfully"]);
         } else {
             http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+            echo json_encode(["error" => "Penalty configuration not found"]);
         }
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(["error" => "Failed to delete business configuration: " . $e->getMessage()]);
+        echo json_encode(["error" => "Failed to delete penalty configuration: " . $e->getMessage()]);
     }
 }
 ?>
