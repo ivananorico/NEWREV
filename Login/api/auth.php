@@ -1,4 +1,5 @@
 <?php
+session_start(); // ADD THIS AT THE TOP
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -112,6 +113,14 @@ function handleLogin($db, $input, &$response) {
     error_log("DEBUG: Checking role - Current role: '" . $user->role . "'");
     if ($user->role === 'admin') {
         error_log("DEBUG: 👑 Admin user detected - redirecting without OTP");
+        
+        // ✅ SET SESSION FOR ADMIN
+        $_SESSION['user_id'] = $user->id;
+        $_SESSION['user_name'] = $user->first_name . ' ' . $user->last_name;
+        $_SESSION['user_email'] = $user->email;
+        $_SESSION['user_role'] = 'admin';
+        $_SESSION['logged_in'] = true;
+        
         $response['success'] = true;
         $response['message'] = 'Admin login successful';
         $response['user_id'] = $user->id;
@@ -240,11 +249,26 @@ function handleOTPVerification($db, $input, &$response) {
         $user = new User($db);
         $user->id = $input['user_id'];
         
-        if ($user->activateAccount()) {
-            $response['success'] = true;
-            $response['message'] = 'OTP verified successfully!';
+        // ✅ GET USER DATA FIRST
+        if ($user->getUserById($input['user_id'])) {
+            // ✅ SET SESSION VARIABLES - THIS IS WHAT WAS MISSING!
+            $_SESSION['user_id'] = $user->id;
+            $_SESSION['user_name'] = $user->first_name . ' ' . $user->last_name;
+            $_SESSION['user_email'] = $user->email;
+            $_SESSION['user_role'] = 'citizen';
+            $_SESSION['logged_in'] = true;
+            
+            error_log("DEBUG: ✅ Session set for user: " . $_SESSION['user_name'] . " (ID: " . $_SESSION['user_id'] . ")");
+            
+            if ($user->activateAccount()) {
+                $response['success'] = true;
+                $response['message'] = 'OTP verified successfully!';
+                $response['redirect_url'] = 'citizen_dashboard/citizen_dashboard.php';
+            } else {
+                $response['message'] = 'Failed to activate account';
+            }
         } else {
-            $response['message'] = 'Failed to activate account';
+            $response['message'] = 'User not found';
         }
     } else {
         $response['message'] = 'Invalid or expired OTP';

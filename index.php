@@ -8,6 +8,15 @@
     <link rel="stylesheet" href="Login/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Ensure modal is perfectly centered */
+        .modal-center {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
 </head>
 <body class="bg-custom-bg min-h-screen flex flex-col">
     <!-- Header Section -->
@@ -126,48 +135,151 @@
         </div>
     </footer>
 
-    <!-- Registration Form -->
-    <div id="registerFormContainer" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold text-custom-secondary">Create your GoServePH account</h2>
-                <button type="button" id="cancelRegister" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-            </div>
-            <form id="registerForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm mb-1">First Name *</label>
-                        <input type="text" name="firstName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Last Name *</label>
-                        <input type="text" name="lastName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Email Address *</label>
-                        <input type="email" name="regEmail" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Mobile Number *</label>
-                        <input type="tel" name="mobile" required class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="09XXXXXXXXX">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Password *</label>
-                        <input type="password" name="regPassword" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Confirm Password *</label>
-                        <input type="password" name="confirmPassword" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    </div>
+    <!-- Registration Form - HIDDEN BY DEFAULT AND CENTERED -->
+    <div id="registerFormContainer" class="fixed inset-0 bg-black/40 hidden p-4 z-50">
+        <div class="flex items-center justify-center min-h-full">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-custom-secondary">Create your GoServePH Account</h2>
+                    <button type="button" id="cancelRegister" class="text-gray-500 hover:text-gray-700 text-xl">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
+                
+                <form id="registerForm" class="space-y-6">
+                    <!-- Personal Information -->
+                    <div class="border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Personal Information</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                                <input type="text" name="firstName" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                                <input type="text" name="lastName" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+                                <input type="text" name="middleName" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Suffix</label>
+                                <select name="suffix" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                                    <option value="">Select Suffix</option>
+                                    <option value="Jr.">Jr.</option>
+                                    <option value="Sr.">Sr.</option>
+                                    <option value="II">II</option>
+                                    <option value="III">III</option>
+                                    <option value="IV">IV</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Birthdate *</label>
+                                <input type="date" name="birthdate" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" id="cancelRegisterBtn" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Cancel</button>
-                    <button type="submit" class="bg-custom-secondary text-white px-4 py-2 rounded-lg hover:bg-blue-700">Register</button>
-                </div>
-            </form>
+                    <!-- Contact Information -->
+                    <div class="border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Contact Information</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
+                                <input type="email" name="regEmail" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Number *</label>
+                                <input type="tel" name="mobile" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent" 
+                                       placeholder="0912 345 6789" pattern="[0-9]{11}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Address Information -->
+                    <div class="border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Address Information</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">House Number *</label>
+                                <input type="text" name="houseNumber" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Street *</label>
+                                <input type="text" name="street" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Barangay *</label>
+                                <input type="text" name="barangay" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Complete Address</label>
+                            <textarea name="address" rows="2" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent"
+                                      placeholder="Full address including city and province"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Account Security -->
+                    <div class="border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Account Security</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                                <input type="password" name="regPassword" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent"
+                                       minlength="6">
+                                <p class="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
+                                <input type="password" name="confirmPassword" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-custom-secondary focus:border-transparent">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terms and Conditions -->
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="space-y-3">
+                            <div class="flex items-start space-x-3">
+                                <input type="checkbox" id="agreeTerms" name="agreeTerms" required 
+                                       class="mt-1 w-4 h-4 text-custom-secondary focus:ring-custom-secondary border-gray-300 rounded">
+                                <label for="agreeTerms" class="text-sm text-gray-700">
+                                    I agree to the <button type="button" class="text-custom-secondary hover:underline font-medium">Terms of Service</button> *
+                                </label>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <input type="checkbox" id="agreePrivacy" name="agreePrivacy" required 
+                                       class="mt-1 w-4 h-4 text-custom-secondary focus:ring-custom-secondary border-gray-300 rounded">
+                                <label for="agreePrivacy" class="text-sm text-gray-700">
+                                    I agree to the <button type="button" class="text-custom-secondary hover:underline font-medium">Privacy Policy</button> *
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" id="cancelRegisterBtn" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium">
+                            Cancel
+                        </button>
+                        <button type="submit" class="bg-custom-secondary text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                            Create Account
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -293,6 +405,22 @@
                     if (e.target === this) closeOtpModal();
                 });
             }
+
+            // Terms and Privacy buttons
+            const footerTerms = document.getElementById('footerTerms');
+            const footerPrivacy = document.getElementById('footerPrivacy');
+            
+            if (footerTerms) {
+                footerTerms.addEventListener('click', function() {
+                    showNotification('Terms of Service will be available soon', 'info');
+                });
+            }
+            
+            if (footerPrivacy) {
+                footerPrivacy.addEventListener('click', function() {
+                    showNotification('Privacy Policy will be available soon', 'info');
+                });
+            }
         }
 
         function setupOTPInputs() {
@@ -414,15 +542,19 @@
 
         async function handleRegisterSubmit(e) {
             e.preventDefault();
+            console.log('📝 Register form submitted');
             
             const formData = new FormData(document.getElementById('registerForm'));
             const data = Object.fromEntries(formData.entries());
             const registerBtn = document.querySelector('#registerForm button[type="submit"]');
 
             // Basic validation
-            if (!data.firstName || !data.lastName || !data.regEmail || !data.regPassword || !data.confirmPassword) {
-                showNotification('Please fill in all required fields', 'error');
-                return;
+            const requiredFields = ['firstName', 'lastName', 'regEmail', 'regPassword', 'confirmPassword', 'birthdate', 'mobile', 'houseNumber', 'street', 'barangay'];
+            for (const field of requiredFields) {
+                if (!data[field] || data[field].trim() === '') {
+                    showNotification('Please fill in all required fields', 'error');
+                    return;
+                }
             }
 
             if (data.regPassword !== data.confirmPassword) {
@@ -435,7 +567,13 @@
                 return;
             }
 
-            setButtonLoading(registerBtn, true, 'Registering...');
+            // Check if terms are agreed
+            if (!data.agreeTerms || !data.agreePrivacy) {
+                showNotification('Please agree to the Terms of Service and Privacy Policy', 'error');
+                return;
+            }
+
+            setButtonLoading(registerBtn, true, 'Creating Account...');
 
             try {
                 const response = await fetch(API_BASE + 'auth.php', {
@@ -472,7 +610,7 @@
                 console.error('Registration error:', error);
                 showNotification('Network error. Please try again.', 'error');
             } finally {
-                setButtonLoading(registerBtn, false, 'Register');
+                setButtonLoading(registerBtn, false, 'Create Account');
             }
         }
 
@@ -511,7 +649,7 @@
                     closeOtpModal();
                     // Redirect to citizen dashboard
                     setTimeout(() => {
-                        window.location.href = 'citizen_dashboard/citizen_dashboard.php';
+                       window.location.href = './citizen_dashboard/citizen_dashboard.php';
                     }, 1500);
                 } else {
                     showError(data.message || 'Invalid OTP');
@@ -571,6 +709,7 @@
             const container = document.getElementById('registerFormContainer');
             if (container) {
                 container.classList.remove('hidden');
+                container.classList.add('modal-center');
                 document.body.style.overflow = 'hidden';
             }
         }
@@ -579,6 +718,7 @@
             const container = document.getElementById('registerFormContainer');
             if (container) {
                 container.classList.add('hidden');
+                container.classList.remove('modal-center');
                 document.body.style.overflow = 'auto';
                 container.querySelector('form').reset();
             }
