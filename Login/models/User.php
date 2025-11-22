@@ -26,7 +26,7 @@ class User {
 
     // Check if email exists
     public function emailExists() {
-        $query = "SELECT id, first_name, last_name, password_hash, status, email_verified 
+        $query = "SELECT id, first_name, last_name, password_hash, status, email_verified, role 
                   FROM " . $this->table_name . " 
                   WHERE email = :email 
                   LIMIT 0,1";
@@ -43,6 +43,7 @@ class User {
             $this->password_hash = $row['password_hash'];
             $this->status = $row['status'];
             $this->email_verified = $row['email_verified'];
+            $this->role = $row['role']; // ADDED THIS LINE
             return true;
         }
         return false;
@@ -50,7 +51,7 @@ class User {
 
     // Get user by ID
     public function getUserById($user_id) {
-        $query = "SELECT id, email, first_name, last_name, password_hash, status, email_verified 
+        $query = "SELECT id, email, first_name, last_name, password_hash, status, email_verified, role 
                   FROM " . $this->table_name . " 
                   WHERE id = :id 
                   LIMIT 1";
@@ -68,6 +69,7 @@ class User {
             $this->password_hash = $row['password_hash'];
             $this->status = $row['status'];
             $this->email_verified = $row['email_verified'];
+            $this->role = $row['role']; // ADDED THIS LINE
             return true;
         }
         return false;

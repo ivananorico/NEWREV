@@ -374,18 +374,32 @@
                 console.log('📨 Login response:', data);
 
                 if (data.success) {
-                    console.log('✅ Login successful, opening OTP modal');
-                    currentUserId = data.user_id;
+                    console.log('✅ Login successful');
                     
-                    // Show debug OTP if available
-                    if (data.debug_otp) {
-                        console.log('🔑 DEBUG OTP:', data.debug_otp);
-                        showNotification('Login successful! OTP: ' + data.debug_otp, 'success');
+                    // Check if user is admin
+                    if (data.user_role === 'admin') {
+                        console.log('👑 Admin user detected, redirecting to admin panel');
+                        showNotification('Admin login successful! Redirecting...', 'success');
+                        
+                        // Redirect admin directly to admin page
+                        setTimeout(() => {
+                            window.location.href = 'admin/admin_dashboard.php';
+                        }, 1000);
                     } else {
-                        showNotification('Login successful! OTP sent to your email.', 'success');
+                        // Regular user - proceed with OTP
+                        console.log('👤 Regular user, opening OTP modal');
+                        currentUserId = data.user_id;
+                        
+                        // Show debug OTP if available
+                        if (data.debug_otp) {
+                            console.log('🔑 DEBUG OTP:', data.debug_otp);
+                            showNotification('Login successful! OTP: ' + data.debug_otp, 'success');
+                        } else {
+                            showNotification('Login successful! OTP sent to your email.', 'success');
+                        }
+                        
+                        openOtpModal();
                     }
-                    
-                    openOtpModal();
                 } else {
                     console.log('❌ Login failed:', data.message);
                     showNotification(data.message || 'Invalid email or password', 'error');
@@ -495,9 +509,9 @@
                 if (data.success) {
                     showNotification('OTP verified successfully!', 'success');
                     closeOtpModal();
-                    // Redirect to dashboard
+                    // Redirect to citizen dashboard
                     setTimeout(() => {
-                        window.location.href = data.redirect || 'dashboard.php';
+                        window.location.href = 'citizen_dashboard/citizen_dashboard.php';
                     }, 1500);
                 } else {
                     showError(data.message || 'Invalid OTP');

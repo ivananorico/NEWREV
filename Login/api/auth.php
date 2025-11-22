@@ -37,6 +37,9 @@ try {
     $database = new Database();
     $db = $database->getConnection();
 
+    // Test password verification - temporary debug
+    testPassword();
+
     switch ($input['action']) {
         case 'login':
             handleLogin($db, $input, $response);
@@ -61,6 +64,18 @@ try {
 
 echo json_encode($response);
 
+// Temporary debug function
+function testPassword() {
+    $password = 'admin';
+    $hash = '$2y$10$r3.bbqix6pX4o.ZQ5WrL.e.bBS.w7/.K.wmM8p8JQc8.wtV7.jB7O';
+    
+    if (password_verify($password, $hash)) {
+        error_log("DEBUG: ✅ Password 'admin' verifies correctly against the hash");
+    } else {
+        error_log("DEBUG: ❌ Password 'admin' does NOT verify against the hash");
+    }
+}
+
 function handleLogin($db, $input, &$response) {
     if (!isset($input['email']) || !isset($input['password'])) {
         $response['message'] = 'Email and password are required';
@@ -70,19 +85,43 @@ function handleLogin($db, $input, &$response) {
     $user = new User($db);
     $user->email = $input['email'];
 
+    error_log("DEBUG: Login attempt for email: " . $input['email']);
+
     // Check if email exists
     if (!$user->emailExists()) {
         $response['message'] = 'Invalid email or password';
+        error_log("DEBUG: ❌ Email not found - " . $input['email']);
         return;
     }
+
+    // Debug: Log what we found
+    error_log("DEBUG: ✅ User found - ID: " . $user->id . ", Email: " . $user->email . ", Role: '" . $user->role . "', Status: " . $user->status);
 
     // Verify password
     if (!$user->verifyPassword($input['password'])) {
         $response['message'] = 'Invalid email or password';
+        error_log("DEBUG: ❌ Password verification failed for: " . $input['email']);
+        error_log("DEBUG: Input password: " . $input['password']);
+        error_log("DEBUG: Stored hash: " . $user->password_hash);
         return;
     }
 
-    // Generate and send OTP
+    error_log("DEBUG: ✅ Password verified successfully for: " . $input['email']);
+
+    // Check if user is admin
+    error_log("DEBUG: Checking role - Current role: '" . $user->role . "'");
+    if ($user->role === 'admin') {
+        error_log("DEBUG: 👑 Admin user detected - redirecting without OTP");
+        $response['success'] = true;
+        $response['message'] = 'Admin login successful';
+        $response['user_id'] = $user->id;
+        $response['user_role'] = 'admin';
+        return;
+    }
+
+    error_log("DEBUG: 👤 Regular user - generating OTP");
+
+    // Generate and send OTP for regular users
     $otp = new OTP($db);
     $otp_code = $otp->generateOTP();
     $otp->user_id = $user->id;
@@ -101,13 +140,13 @@ function handleLogin($db, $input, &$response) {
             $response['success'] = true;
             $response['message'] = 'OTP sent to your email';
             $response['user_id'] = $user->id;
-            $response['requires_otp'] = true;
+            $response['user_role'] = 'user';
         } else {
             // Fallback: show OTP if email fails
             $response['success'] = true;
             $response['message'] = 'OTP: ' . $otp_code . ' (Check email failed)';
             $response['user_id'] = $user->id;
-            $response['requires_otp'] = true;
+            $response['user_role'] = 'user';
             $response['debug_otp'] = $otp_code;
         }
     } else {
@@ -173,13 +212,11 @@ function handleRegister($db, $input, &$response) {
                 $response['success'] = true;
                 $response['message'] = 'Registration successful! OTP sent to your email.';
                 $response['user_id'] = $user->id;
-                $response['requires_otp'] = true;
             } else {
                 // Fallback: show OTP if email fails
                 $response['success'] = true;
                 $response['message'] = 'Registration successful! OTP: ' . $otp_code . ' (Check email failed)';
                 $response['user_id'] = $user->id;
-                $response['requires_otp'] = true;
                 $response['debug_otp'] = $otp_code;
             }
         } else {
@@ -206,7 +243,6 @@ function handleOTPVerification($db, $input, &$response) {
         if ($user->activateAccount()) {
             $response['success'] = true;
             $response['message'] = 'OTP verified successfully!';
-            $response['redirect'] = 'dashboard.php';
         } else {
             $response['message'] = 'Failed to activate account';
         }
