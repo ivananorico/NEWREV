@@ -51,10 +51,10 @@ try {
     $stmt->execute([$mapName, $imagePath]);
     $mapId = $pdo->lastInsertId();
 
-    // Insert stalls - Updated to use section_id instead of market_section
+    // Insert stalls - UPDATED with pixel_width and pixel_height
     $stmtStall = $pdo->prepare("
-        INSERT INTO stalls (map_id, name, pos_x, pos_y, price, height, length, width, status, class_id, section_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO stalls (map_id, name, pos_x, pos_y, price, height, length, width, pixel_width, pixel_height, status, class_id, section_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($stalls as $stall) {
@@ -63,13 +63,15 @@ try {
             $stall['name'] ?? 'Unnamed Stall',
             $stall['pos_x'] ?? 0,
             $stall['pos_y'] ?? 0,
-            $stall['price'] ?? 0, // Use custom price exactly as provided
-            $stall['height'] ?? 0,
-            $stall['length'] ?? 0,
-            $stall['width'] ?? 0,
+            $stall['price'] ?? 0,
+            $stall['height'] ?? 0,           // Physical height in meters
+            $stall['length'] ?? 0,           // Physical length in meters
+            $stall['width'] ?? 0,            // Physical width in meters
+            $stall['pixel_width'] ?? 80,     // NEW: Visual width in pixels
+            $stall['pixel_height'] ?? 60,    // NEW: Visual height in pixels
             $stall['status'] ?? 'available',
-            $stall['class_id'] ?? 3, // Default to Class C
-            $stall['section_id'] ?? null // Use section_id instead of market_section
+            $stall['class_id'] ?? 3,
+            $stall['section_id'] ?? null
         ]);
     }
 

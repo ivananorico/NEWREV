@@ -32,7 +32,7 @@ try {
         throw new Exception("Map not found");
     }
 
-    // Fetch stalls for this map WITH CLASS INFORMATION AND SECTION INFORMATION
+    // Fetch stalls for this map WITH PIXEL DIMENSIONS - UPDATED QUERY
     $stmtStalls = $pdo->prepare("
         SELECT 
             s.id, 
@@ -43,14 +43,16 @@ try {
             s.height, 
             s.length, 
             s.width,
+            s.pixel_width,     -- ADD THIS
+            s.pixel_height,    -- ADD THIS
             s.status,
             s.class_id,
-            s.section_id,  -- Use section_id instead of market_section
+            s.section_id,
             sc.class_name,
-            sec.name as section_name  -- Get section name from sections table
+            sec.name as section_name
         FROM stalls s 
         LEFT JOIN stall_rights sc ON s.class_id = sc.class_id 
-        LEFT JOIN sections sec ON s.section_id = sec.id  -- Join with sections table
+        LEFT JOIN sections sec ON s.section_id = sec.id
         WHERE s.map_id = ?
     ");
     $stmtStalls->execute([$mapId]);

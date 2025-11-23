@@ -1,4 +1,3 @@
-// src/pages/Market/MapCreator/MarketOutput.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "./MarketOutput.css";
@@ -12,7 +11,6 @@ export default function MarketOutput() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // CORRECTED URL - Fixed typo from MapCretor to MapCreator
   const API_BASE = "http://localhost/revenue/backend/Market/MapCreator";
 
   console.log("MarketOutput mounted with ID:", id);
@@ -32,7 +30,14 @@ export default function MarketOutput() {
           setMapName(data.map.name);
           const baseUrl = "http://localhost/revenue";
           setMapImage(`${baseUrl}/${data.map.image_path}`);
-          setStalls(data.stalls || []);
+          
+          // Ensure stalls have pixel dimensions, use defaults if not present
+          const stallsWithPixelDims = (data.stalls || []).map(stall => ({
+            ...stall,
+            pixel_width: stall.pixel_width || 80,
+            pixel_height: stall.pixel_height || 60
+          }));
+          setStalls(stallsWithPixelDims);
         } else {
           throw new Error(data.message || "Unknown error from API");
         }
@@ -67,7 +72,6 @@ export default function MarketOutput() {
       <p>Map ID: {id}</p>
       <button 
         className="back-button"
-        // CORRECTED URL - Fixed typo in navigation
         onClick={() => navigate("/Market/MapCreator")}
       >
         Back to Market Creator
@@ -113,11 +117,20 @@ export default function MarketOutput() {
               className={`stall-marker ${stall.status || 'available'}`}
               style={{
                 left: `${stall.pos_x}px`,
-                top: `${stall.pos_y}px`
+                top: `${stall.pos_y}px`,
+                width: `${stall.pixel_width}px`,
+                height: `${stall.pixel_height}px`
               }}
-              title={`${stall.name} - $${stall.price} - ${stall.status || 'available'}`}
+              title={`${stall.name} - ₱${stall.price?.toLocaleString()} - ${stall.status || 'available'}`}
             >
-              {stall.name}
+              <div className="stall-content">
+                <div className="stall-name">{stall.name}</div>
+                <div className="stall-class">Class: {stall.class_name}</div>
+                <div className="stall-price">₱{stall.price?.toLocaleString()}</div>
+                {stall.section_name && (
+                  <div className="stall-section">Section: {stall.section_name}</div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -129,7 +142,6 @@ export default function MarketOutput() {
 
       <button 
         className="back-button"
-        // CORRECTED URL - Fixed typo in navigation
         onClick={() => navigate("/Market/MapCreator")}
       >
         Back to Market Creator

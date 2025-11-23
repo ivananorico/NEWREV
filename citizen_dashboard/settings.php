@@ -40,8 +40,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         updatePersonalInfo($db, $user_id, $_POST);
     } elseif (isset($_POST['update_password'])) {
         updatePassword($db, $user_id, $_POST);
-    } elseif (isset($_POST['update_preferences'])) {
-        updatePreferences($db, $user_id, $_POST);
     }
 }
 
@@ -125,13 +123,6 @@ function updatePassword($db, $user_id, $data) {
     header('Location: settings.php');
     exit();
 }
-
-function updatePreferences($db, $user_id, $data) {
-    // Handle preferences update if needed
-    $_SESSION['success_message'] = 'Preferences updated successfully!';
-    header('Location: settings.php');
-    exit();
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -180,10 +171,6 @@ function updatePreferences($db, $user_id, $data) {
                             <a href="#security" class="flex items-center space-x-3 p-3 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                                 <i class="fas fa-shield-alt w-5"></i>
                                 <span>Security</span>
-                            </a>
-                            <a href="#preferences" class="flex items-center space-x-3 p-3 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                                <i class="fas fa-cog w-5"></i>
-                                <span>Preferences</span>
                             </a>
                         </nav>
                     </div>
@@ -288,7 +275,7 @@ function updatePreferences($db, $user_id, $data) {
                     </div>
 
                     <!-- Security Section -->
-                    <div id="security" class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+                    <div id="security" class="bg-white rounded-lg shadow-sm border p-6">
                         <h2 class="text-xl font-semibold text-gray-800 mb-4">Security</h2>
                         
                         <form method="POST" class="space-y-4">
@@ -316,37 +303,6 @@ function updatePreferences($db, $user_id, $data) {
                             <div class="flex justify-end">
                                 <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
                                     Change Password
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Preferences Section -->
-                    <div id="preferences" class="bg-white rounded-lg shadow-sm border p-6">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Preferences</h2>
-                        
-                        <form method="POST" class="space-y-4">
-                            <input type="hidden" name="update_preferences" value="1">
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Language</label>
-                                <select name="language" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option>English</option>
-                                    <option>Filipino</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Time Zone</label>
-                                <select name="timezone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option>Philippine Standard Time (PST)</option>
-                                    <option>UTC+08:00</option>
-                                </select>
-                            </div>
-
-                            <div class="flex justify-end">
-                                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                                    Save Preferences
                                 </button>
                             </div>
                         </form>

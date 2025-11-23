@@ -32,6 +32,76 @@ $base_path = str_replace('/rpt', '', $base_path); // Remove any /rpt subdirector
     --accent: #FDA811;
     --background: #FBFBFB;
 }
+
+.dropdown-container {
+    position: relative;
+}
+
+.dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.5rem;
+    width: 12rem;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease-in-out;
+    z-index: 50;
+}
+
+.dropdown-container:hover .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-menu::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 12px;
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    transform: rotate(45deg);
+    border-top: 1px solid #e5e7eb;
+    border-left: 1px solid #e5e7eb;
+}
+
+.dropdown-link {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: #374151;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    border-radius: 0.25rem;
+    margin: 0.25rem;
+}
+
+.dropdown-link:hover {
+    background-color: #f3f4f6;
+}
+
+.dropdown-link.settings:hover {
+    background-color: #eff6ff;
+    color: #1e40af;
+}
+
+.dropdown-link.logout:hover {
+    background-color: #fef2f2;
+    color: #dc2626;
+}
+
+.divider {
+    height: 1px;
+    background-color: #e5e7eb;
+    margin: 0.25rem 0.5rem;
+}
 </style>
 
 <!-- Navigation Bar -->
@@ -67,20 +137,19 @@ $base_path = str_replace('/rpt', '', $base_path); // Remove any /rpt subdirector
                     </p>
                 </div>
 
-                <div class="relative group">
-                    <button class="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+                <div class="dropdown-container">
+                    <button class="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-gray-200"
                         style="background-color: #e5e7eb;">
                         <i class="fas fa-user" style="color: #4b5563;"></i>
                     </button>
 
                     <!-- Dropdown Menu -->
-                    <div class="absolute right-0 mt-2 w-48 rounded-lg shadow-xl py-2 hidden group-hover:block z-50 border"
-                        style="background-color: #ffffff;">
-                        <a href="<?php echo $base_path; ?>/settings.php" class="block px-4 py-2 hover:bg-blue-50" style="color: #374151;">
+                    <div class="dropdown-menu">
+                        <a href="<?php echo $base_path; ?>/settings.php" class="dropdown-link settings">
                             <i class="fas fa-user-cog mr-2"></i>Profile & Settings
                         </a>
-                        <div class="border-t my-1" style="border-color: #e5e7eb;"></div>
-                        <a href="<?php echo $base_path; ?>/logout.php" class="block px-4 py-2 hover:bg-red-50" style="color: #dc2626;">
+                        <div class="divider"></div>
+                        <a href="<?php echo $base_path; ?>/logout.php" class="dropdown-link logout">
                             <i class="fas fa-sign-out-alt mr-2"></i>Logout
                         </a>
                     </div>

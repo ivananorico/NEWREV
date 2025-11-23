@@ -25,16 +25,16 @@ try {
     $defaultClass = $defaultClassStmt->fetch(PDO::FETCH_ASSOC);
     $defaultClassId = $defaultClass ? $defaultClass['class_id'] : null;
 
-    // Update existing stalls and insert new ones - Updated to use section_id
+    // Update existing stalls and insert new ones - UPDATED WITH PIXEL DIMENSIONS
     $updateStmt = $pdo->prepare("
         UPDATE stalls 
-        SET name = ?, pos_x = ?, pos_y = ?, price = ?, height = ?, length = ?, width = ?, status = ?, class_id = ?, section_id = ?
+        SET name = ?, pos_x = ?, pos_y = ?, price = ?, height = ?, length = ?, width = ?, pixel_width = ?, pixel_height = ?, status = ?, class_id = ?, section_id = ?
         WHERE id = ? AND map_id = ?
     ");
 
     $insertStmt = $pdo->prepare("
-        INSERT INTO stalls (map_id, name, pos_x, pos_y, price, height, length, width, status, class_id, section_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO stalls (map_id, name, pos_x, pos_y, price, height, length, width, pixel_width, pixel_height, status, class_id, section_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $updatedCount = 0;
@@ -47,6 +47,10 @@ try {
         // Handle section_id - convert to NULL if empty or not set
         $section_id = isset($stall['section_id']) && $stall['section_id'] !== '' ? $stall['section_id'] : null;
         
+        // Handle pixel dimensions - use provided or defaults
+        $pixel_width = $stall['pixel_width'] ?? 80;
+        $pixel_height = $stall['pixel_height'] ?? 60;
+        
         if (isset($stall['id']) && !isset($stall['isNew'])) {
             // Update existing stall
             $updateStmt->execute([
@@ -57,9 +61,11 @@ try {
                 $stall['height'] ?? 0,
                 $stall['length'] ?? 0,
                 $stall['width'] ?? 0,
+                $pixel_width,      // ADD THIS
+                $pixel_height,     // ADD THIS
                 $stall['status'] ?? 'available',
                 $class_id,
-                $section_id, // Use section_id instead of market_section
+                $section_id,
                 $stall['id'],
                 $mapId
             ]);
@@ -75,9 +81,11 @@ try {
                 $stall['height'] ?? 0,
                 $stall['length'] ?? 0,
                 $stall['width'] ?? 0,
+                $pixel_width,      // ADD THIS
+                $pixel_height,     // ADD THIS
                 $stall['status'] ?? 'available',
                 $class_id,
-                $section_id // Use section_id instead of market_section
+                $section_id
             ]);
             $insertedCount++;
         }
