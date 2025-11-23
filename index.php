@@ -511,7 +511,7 @@
                         
                         // Redirect admin directly to admin page
                         setTimeout(() => {
-                            window.location.href = 'admin/admin_dashboard.php';
+                            window.location.href = 'dist';
                         }, 1000);
                     } else {
                         // Regular user - proceed with OTP

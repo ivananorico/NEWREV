@@ -135,7 +135,8 @@ function Sidebar({ collapsed }) {
       </nav>
       
       <hr className='border-slate-300 dark:border-slate-700 mx-2' />
-      <ProfileCard collapsed={collapsed} name="LEIVY" role="Super Saiyan" avatarUrl="/public/Bartss.png" />
+      <ProfileCard collapsed={collapsed} name="ADMIN" role="Super Saiyan" avatarUrl="/Bartss.png" />
+
     </div>
   )
 }
