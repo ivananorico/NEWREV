@@ -41,7 +41,7 @@ $user_name = $_SESSION['user_name'] ?? 'Citizen';
         <!-- RPT Services Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- Registration and Transfer Card -->
-            <a href="rpt_registration.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-purple-500 hover:scale-105 cursor-pointer block">
+            <a href="rpt_registration/rpt_registration.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-purple-500 hover:scale-105 cursor-pointer block">
                 <div class="flex items-center justify-between mb-4">
                     <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                         <i class="fas fa-file-alt text-purple-600 text-xl"></i>
@@ -59,7 +59,7 @@ $user_name = $_SESSION['user_name'] ?? 'Citizen';
             </a>
 
             <!-- Application Status Card -->
-            <a href="rpt_status.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-yellow-500 hover:scale-105 cursor-pointer block">
+            <a href="rpt_application/rpt_application.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-yellow-500 hover:scale-105 cursor-pointer block">
                 <div class="flex items-center justify-between mb-4">
                     <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                         <i class="fas fa-tasks text-yellow-600 text-xl"></i>

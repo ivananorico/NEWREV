@@ -11,7 +11,8 @@ import SecuritySettings from './pages/settings/Security'
 
 // RPT Pages
 import RPTConfig from './pages/RPT/RPTConfig/RPTConfig'
-import RPT2 from './pages/RPT/RPT2/RPT2'
+import RPTValidationTable from './pages/RPT/RPTValidationTable/RPTValidationTable'
+import RPTValidationInfo from './pages/RPT/RPTValidationTable/RPTValidationInfo'
 import RPT3 from './pages/RPT/RPT3/RPT3'
 
 // BUSINESS Pages
@@ -66,7 +67,8 @@ function App() {
 
               {/* RPT */}
               <Route path="/rpt/rptconfig" element={<RPTConfig />} />
-              <Route path="/rpt/rpt2" element={<RPT2 />} />
+              <Route path="/rpt/rptvalidationtable" element={<RPTValidationTable />} />
+              <Route path="/rpt/rptvalidationinfo/:id" element={<RPTValidationInfo />} />
               <Route path="/rpt/rpt3" element={<RPT3 />} />
 
               {/* BUSINESS */}

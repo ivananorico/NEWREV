@@ -41,7 +41,7 @@ $user_name = $_SESSION['user_name'] ?? 'Citizen';
         <!-- Market Services Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- Rent a Market Card -->
-            <a href="rent_market.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-indigo-500 hover:scale-105 cursor-pointer block">
+            <a href="market_portal_services/market_portal_services.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-indigo-500 hover:scale-105 cursor-pointer block">
                 <div class="flex items-center justify-between mb-4">
                     <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
                         <i class="fas fa-store text-indigo-600 text-xl"></i>
