@@ -11,18 +11,8 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['user_name'] ?? 'Citizen';
 
-// Direct database connection
-$host = 'localhost:3307';
-$dbname = 'rpt';
-$username = 'root';
-$password = '';
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
-}
+// Include database connection
+require_once '../../../db/RPT/rpt_db.php';
 
 // Handle form submission
 $message = '';
@@ -53,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         $owner_id = $pdo->lastInsertId();
         
-        // 2. Insert into property_registrations (UPDATED - no lot_number)
+        // 2. Insert into property_registrations
         $reg_stmt = $pdo->prepare("INSERT INTO property_registrations 
             (reference_number, owner_id, lot_location, barangay, district, has_building, status) 
             VALUES (?, ?, ?, ?, ?, ?, 'pending')");
