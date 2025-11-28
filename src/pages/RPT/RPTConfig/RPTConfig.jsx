@@ -19,8 +19,7 @@ export default function RPTConfig() {
     description: '',
     effective_date: '',
     expiration_date: '',
-    status: 'active',
-    vicinity: 'General Area'
+    status: 'active'
   });
 
   // Property Configuration Form
@@ -37,7 +36,7 @@ export default function RPTConfig() {
     status: 'active'
   });
 
-  // Tax Configuration Form
+  // Tax Configuration Form - Fixed for Basic Tax and SEF Tax
   const [taxFormData, setTaxFormData] = useState({
     tax_name: '',
     tax_percent: '',
@@ -204,6 +203,13 @@ export default function RPTConfig() {
 
   const handleTaxSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate tax name to only allow Basic Tax or SEF Tax
+    if (!['Basic Tax', 'SEF Tax'].includes(taxFormData.tax_name)) {
+      alert('Tax name must be either "Basic Tax" or "SEF Tax"');
+      return;
+    }
+
     const url = editingId ? `${API_BASE}/tax-configurations.php?id=${editingId}` : `${API_BASE}/tax-configurations.php`;
     const method = editingId ? 'PUT' : 'POST';
 
@@ -286,8 +292,7 @@ export default function RPTConfig() {
       description: config.description,
       effective_date: config.effective_date,
       expiration_date: config.expiration_date || '',
-      status: config.status,
-      vicinity: config.vicinity || 'General Area'
+      status: config.status
     });
     setEditingId(config.id);
     setEditingType('land');
@@ -401,8 +406,7 @@ export default function RPTConfig() {
       description: '',
       effective_date: '',
       expiration_date: '',
-      status: 'active',
-      vicinity: 'General Area'
+      status: 'active'
     });
     setEditingId(null);
     setEditingType(null);
@@ -465,6 +469,10 @@ export default function RPTConfig() {
   const activeTaxConfigs = taxConfigurations.filter(config => config.status === 'active').length;
   const activeDiscountConfigs = discountConfigurations.filter(config => config.status === 'active').length;
   const activePenaltyConfigs = penaltyConfigurations.filter(config => config.status === 'active').length;
+
+  // Check if Basic Tax and SEF Tax already exist
+  const basicTaxExists = taxConfigurations.some(tax => tax.tax_name === 'Basic Tax' && tax.status === 'active');
+  const sefTaxExists = taxConfigurations.some(tax => tax.tax_name === 'SEF Tax' && tax.status === 'active');
 
   return (
     <div className='mx-1 mt-1 p-6 dark:bg-slate-900 bg-white dark:text-slate-300 rounded-lg'>
@@ -573,17 +581,6 @@ export default function RPTConfig() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Vicinity *</label>
-                <input
-                  type="text"
-                  value={landFormData.vicinity}
-                  onChange={(e) => setLandFormData({...landFormData, vicinity: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="e.g., City Center, Suburban Area"
-                  required
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium mb-2">Market Value (per sqm) *</label>
                 <input
                   type="number"
@@ -671,7 +668,6 @@ export default function RPTConfig() {
                   <thead>
                     <tr className="bg-gray-100 dark:bg-slate-800">
                       <th className="border p-2 text-left">Classification</th>
-                      <th className="border p-2 text-left">Vicinity</th>
                       <th className="border p-2 text-left">Market Value</th>
                       <th className="border p-2 text-left">Assessment Level</th>
                       <th className="border p-2 text-left">Assessed Value</th>
@@ -687,7 +683,6 @@ export default function RPTConfig() {
                           <div className="font-medium">{config.classification}</div>
                           {config.description && <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{config.description}</div>}
                         </td>
-                        <td className="border p-2">{config.vicinity}</td>
                         <td className="border p-2">₱{parseFloat(config.market_value).toLocaleString()}</td>
                         <td className="border p-2">{config.assessment_level}%</td>
                         <td className="border p-2">₱{(config.market_value * (config.assessment_level / 100)).toFixed(2)}</td>
@@ -927,17 +922,37 @@ export default function RPTConfig() {
             <h2 className="text-xl font-semibold mb-4">
               {editingType === 'tax' ? 'Edit Tax Configuration' : 'Add New Tax Configuration'}
             </h2>
+            
+            {/* Tax Status Info */}
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`p-4 rounded-lg border ${basicTaxExists ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <h3 className="font-semibold mb-2">Basic Tax Status</h3>
+                <p className={basicTaxExists ? 'text-green-700' : 'text-yellow-700'}>
+                  {basicTaxExists ? '✅ Active configuration exists' : '⚠️ No active configuration'}
+                </p>
+              </div>
+              <div className={`p-4 rounded-lg border ${sefTaxExists ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <h3 className="font-semibold mb-2">SEF Tax Status</h3>
+                <p className={sefTaxExists ? 'text-green-700' : 'text-yellow-700'}>
+                  {sefTaxExists ? '✅ Active configuration exists' : '⚠️ No active configuration'}
+                </p>
+              </div>
+            </div>
+
             <form onSubmit={handleTaxSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Tax Name *</label>
-                <input
-                  type="text"
+                <select
                   value={taxFormData.tax_name}
                   onChange={(e) => setTaxFormData({...taxFormData, tax_name: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="e.g., RPT, Special Tax"
                   required
-                />
+                >
+                  <option value="">Select Tax Type</option>
+                  <option value="Basic Tax">Basic Tax</option>
+                  <option value="SEF Tax">SEF Tax</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Only Basic Tax and SEF Tax are allowed</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Tax Percentage (%) *</label>
@@ -1014,7 +1029,11 @@ export default function RPTConfig() {
                   <tbody>
                     {taxConfigurations.map((config) => (
                       <tr key={config.id} className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${config.status === 'expired' ? 'bg-gray-50 dark:bg-slate-800/50 text-gray-500' : ''}`}>
-                        <td className="border p-2">{config.tax_name}</td>
+                        <td className="border p-2">
+                          <span className={`font-medium ${config.tax_name === 'Basic Tax' ? 'text-blue-600' : 'text-green-600'}`}>
+                            {config.tax_name}
+                          </span>
+                        </td>
                         <td className="border p-2">{config.tax_percent}%</td>
                         <td className="border p-2">{config.effective_date}</td>
                         <td className="border p-2">{config.expiration_date || '-'}</td>
