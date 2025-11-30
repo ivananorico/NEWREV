@@ -36,7 +36,7 @@ export default function RPTConfig() {
     status: 'active'
   });
 
-  // Tax Configuration Form - Fixed for Basic Tax and SEF Tax
+  // Tax Configuration Form
   const [taxFormData, setTaxFormData] = useState({
     tax_name: '',
     tax_percent: '',
@@ -66,7 +66,7 @@ export default function RPTConfig() {
 
   const API_BASE = "http://localhost/revenue/backend/RPT/RPTConfig";
 
-  // Fetch all data
+  // Fetch all data with hyphenated endpoints
   const fetchLandConfigurations = async () => {
     try {
       setLoading(true);
@@ -150,7 +150,7 @@ export default function RPTConfig() {
     fetchPenaltyConfigurations();
   }, [currentDate]);
 
-  // Form Handlers
+  // Form Handlers with hyphenated endpoints
   const handleLandSubmit = async (e) => {
     e.preventDefault();
     const url = editingId ? `${API_BASE}/land-configurations.php?id=${editingId}` : `${API_BASE}/land-configurations.php`;
@@ -349,7 +349,7 @@ export default function RPTConfig() {
     setEditingType('penalty');
   };
 
-  // Common Handlers
+  // Common Handlers with hyphenated endpoints
   const handleDelete = async (id, type) => {
     const typeName = type.replace('-configurations', '').replace('-', ' ');
     if (window.confirm(`Are you sure you want to delete this ${typeName} configuration?`)) {

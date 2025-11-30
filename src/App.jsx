@@ -13,7 +13,9 @@ import SecuritySettings from './pages/settings/Security'
 import RPTConfig from './pages/RPT/RPTConfig/RPTConfig'
 import RPTValidationTable from './pages/RPT/RPTValidationTable/RPTValidationTable'
 import RPTValidationInfo from './pages/RPT/RPTValidationTable/RPTValidationInfo'
-import RPT3 from './pages/RPT/RPT3/RPT3'
+import RPTStatus from './pages/RPT/RPTStatus/RPTStatus'
+import RPTStatusInfo from './pages/RPT/RPTStatus/RPTStatusInfo'
+import RPT4s from './pages/RPT/RPT4s/RPT4s'
 
 // BUSINESS Pages
 import BusinessTaxConfig from './pages/BUSINESS/BusinessTaxConfig/BusinessTaxConfig'
@@ -69,7 +71,9 @@ function App() {
               <Route path="/rpt/rptconfig" element={<RPTConfig />} />
               <Route path="/rpt/rptvalidationtable" element={<RPTValidationTable />} />
               <Route path="/rpt/rptvalidationinfo/:id" element={<RPTValidationInfo />} />
-              <Route path="/rpt/rpt3" element={<RPT3 />} />
+              <Route path="/rpt/rptstatus" element={<RPTStatus />} />
+              <Route path="/rpt/rptstatusinfo/:id" element={<RPTStatusInfo />} />
+              <Route path="/rpt/rpt4s" element={<RPT4s />} />
 
               {/* BUSINESS */}
               <Route path="/business/businesstaxconfig" element={<BusinessTaxConfig />} />

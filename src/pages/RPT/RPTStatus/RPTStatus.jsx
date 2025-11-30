@@ -1,62 +1,56 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function RPTValidationTable() {
-  const [registrations, setRegistrations] = useState([]);
+export default function RPTStatus() {
+  const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Updated API base URL with correct path
-  const API_BASE = "http://localhost/revenue/backend/RPT/RPTValidationTable";
+  const API_BASE = "http://localhost/revenue/backend/RPT/RPTStatus";
 
-  // Fetch all property registrations
   useEffect(() => {
-    fetchRegistrations();
+    fetchApprovedProperties();
   }, []);
 
-  const fetchRegistrations = async () => {
+  const fetchApprovedProperties = async () => {
     try {
-      const response = await fetch(`${API_BASE}/get_registrations.php`);
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`${API_BASE}/get_approved_properties.php`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
 
       if (data.status === "success") {
-        // Filter out approved registrations - only show pending, for_inspection, needs_correction, assessed
-        const filteredRegistrations = data.registrations.filter(
-          registration => registration.status !== 'approved'
-        );
-        setRegistrations(filteredRegistrations);
+        setProperties(data.properties || []);
       } else {
-        throw new Error(data.message || "Failed to fetch registrations");
+        throw new Error(data.message || "Failed to fetch approved properties");
       }
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching registrations:", err);
+      console.error("Error fetching approved properties:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Get status badge color
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      pending: { color: "bg-yellow-100 text-yellow-800", label: "Pending" },
-      for_inspection: { color: "bg-blue-100 text-blue-800", label: "For Inspection" },
-      needs_correction: { color: "bg-orange-100 text-orange-800", label: "Needs Correction" },
-      assessed: { color: "bg-purple-100 text-purple-800", label: "Assessed" },
-      approved: { color: "bg-green-100 text-green-800", label: "Approved" }
-    };
-    
-    const config = statusConfig[status] || { color: "bg-gray-100 text-gray-800", label: status };
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.label}
-      </span>
-    );
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
   };
 
   // Format date
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -64,9 +58,9 @@ export default function RPTValidationTable() {
     });
   };
 
-  // Handle view details
-  const handleViewDetails = (registrationId) => {
-    navigate(`/rpt/rptvalidationinfo/${registrationId}`);
+  // Handle view property details
+  const handleViewDetails = (propertyId) => {
+    navigate(`/rpt/rptstatusinfo/${propertyId}`);
   };
 
   if (loading) {
@@ -74,7 +68,7 @@ export default function RPTValidationTable() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading registrations...</span>
+          <span className="ml-3 text-gray-600">Loading approved properties...</span>
         </div>
       </div>
     );
@@ -87,7 +81,7 @@ export default function RPTValidationTable() {
           <div className="text-red-500 text-lg mb-2">Error Loading Data</div>
           <div className="text-gray-600 text-sm">{error}</div>
           <button
-            onClick={fetchRegistrations}
+            onClick={fetchApprovedProperties}
             className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm transition-colors"
           >
             Retry
@@ -103,16 +97,13 @@ export default function RPTValidationTable() {
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Property Registration Applications</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Approved Properties</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {registrations.length} pending application{registrations.length !== 1 ? 's' : ''} found
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Showing only non-approved applications (Pending, For Inspection, Needs Correction, Assessed)
+              {properties.length} approved propert{properties.length !== 1 ? 'ies' : 'y'} found
             </p>
           </div>
           <button
-            onClick={fetchRegistrations}
+            onClick={fetchApprovedProperties}
             className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm transition-colors flex items-center"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,13 +129,16 @@ export default function RPTValidationTable() {
                 Property Location
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Building
+                Building Info
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                Land Area
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Submitted
+                Annual Tax
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Approval Date
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -152,51 +146,62 @@ export default function RPTValidationTable() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {registrations.length === 0 ? (
+            {properties.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
                   <div className="flex flex-col items-center">
                     <svg className="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                    <p className="text-lg font-medium text-gray-900 mb-1">No pending applications</p>
-                    <p className="text-gray-500">All property registration applications have been approved.</p>
+                    <p className="text-lg font-medium text-gray-900 mb-1">No approved properties</p>
+                    <p className="text-gray-500">No properties have been approved yet.</p>
                   </div>
                 </td>
               </tr>
             ) : (
-              registrations.map((registration) => (
-                <tr key={registration.id} className="hover:bg-gray-50 transition-colors">
+              properties.map((property) => (
+                <tr key={property.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{registration.reference_number}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{registration.owner_name}</div>
-                    <div className="text-sm text-gray-500">{registration.email}</div>
-                    <div className="text-sm text-gray-500">{registration.phone}</div>
+                    <div className="text-sm font-medium text-gray-900">{property.reference_number}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{registration.lot_location}</div>
-                    <div className="text-sm text-gray-500">{registration.barangay}, {registration.district}</div>
+                    <div className="text-sm font-medium text-gray-900">{property.owner_name}</div>
+                    <div className="text-sm text-gray-500">{property.email}</div>
+                    <div className="text-sm text-gray-500">{property.phone}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      registration.has_building === 'yes' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {registration.has_building === 'yes' ? 'With Building' : 'Vacant Land'}
-                    </span>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-gray-900">{property.lot_location}</div>
+                    <div className="text-sm text-gray-500">{property.barangay}, {property.district}</div>
+                    <div className="text-xs text-gray-500">{property.land_classification}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(registration.status)}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col space-y-1">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        property.has_building === 'yes' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {property.has_building === 'yes' ? 'With Building' : 'Vacant Land'}
+                      </span>
+                      {property.has_building === 'yes' && property.building_count > 0 && (
+                        <span className="text-xs text-gray-500">
+                          {property.building_count} building{property.building_count !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {property.land_area_sqm} sqm
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {formatCurrency(property.total_annual_tax)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(registration.created_at)}
+                    {formatDate(property.approval_date)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => handleViewDetails(registration.id)}
+                      onClick={() => handleViewDetails(property.id)}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
                     >
                       View Details
