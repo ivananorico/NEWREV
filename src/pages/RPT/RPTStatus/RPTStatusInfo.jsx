@@ -164,7 +164,7 @@ export default function RPTStatusInfo() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 mb-6">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
-              {['overview', 'buildings', 'taxes'].map((tab) => (
+              {['overview', 'land-building', 'taxes'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -175,7 +175,7 @@ export default function RPTStatusInfo() {
                   }`}
                 >
                   {tab === 'overview' && 'Property Overview'}
-                  {tab === 'buildings' && `Buildings (${buildings.length})`}
+                  {tab === 'land-building' && `Land & Building (${buildings.length})`}
                   {tab === 'taxes' && `Tax Records (${quarterlyTaxes.length})`}
                 </button>
               ))}
@@ -286,75 +286,121 @@ export default function RPTStatusInfo() {
               </div>
             )}
 
-            {/* Buildings Tab */}
-            {activeTab === 'buildings' && (
-              <div>
+            {/* Land & Building Tab */}
+            {activeTab === 'land-building' && (
+              <div className="space-y-6">
+                {/* Land Information Card */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                  <div className="flex items-center mb-4">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">Land Information</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Land TDN</label>
+                      <p className="text-gray-900 font-mono text-sm">{property.land_tdn}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Classification</label>
+                      <p className="text-gray-900">{property.land_classification}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Land Area</label>
+                      <p className="text-gray-900 font-medium">{property.land_area_sqm} sqm</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Market Value</label>
+                      <p className="text-gray-900 font-medium">{formatCurrency(property.land_market_value)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Assessed Value</label>
+                      <p className="text-gray-900 font-medium">{formatCurrency(property.land_assessed_value)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Assessment Level</label>
+                      <p className="text-gray-900">{property.assessment_level}%</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Annual Tax</label>
+                      <p className="text-lg font-bold text-green-600">{formatCurrency(property.land_annual_tax)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Building Information */}
                 {buildings.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {buildings.map((building, index) => (
-                      <div key={building.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-lg font-semibold text-gray-900">Building {index + 1}</h4>
-                          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
-                            {building.tdn}
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span className="text-gray-500">Floor Area:</span>
-                              <p className="font-medium text-gray-900">{building.floor_area_sqm} sqm</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Year Built:</span>
-                              <p className="font-medium text-gray-900">{building.year_built}</p>
-                            </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Building Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {buildings.map((building, index) => (
+                        <div key={building.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-lg font-semibold text-gray-900">Building {index + 1}</h4>
+                            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
+                              {building.tdn}
+                            </span>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span className="text-gray-500">Construction:</span>
-                              <p className="font-medium text-gray-900">{building.construction_type}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Material:</span>
-                              <p className="font-medium text-gray-900">{building.material_type}</p>
-                            </div>
-                          </div>
-                          
-                          <div className="pt-3 border-t border-gray-200">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
                               <div>
-                                <span className="text-gray-500">Market Value:</span>
-                                <p className="font-medium text-gray-900">{formatCurrency(building.building_market_value)}</p>
+                                <span className="text-gray-500">Floor Area:</span>
+                                <p className="font-medium text-gray-900">{building.floor_area_sqm} sqm</p>
                               </div>
                               <div>
-                                <span className="text-gray-500">Assessed Value:</span>
-                                <p className="font-medium text-gray-900">{formatCurrency(building.building_assessed_value)}</p>
+                                <span className="text-gray-500">Year Built:</span>
+                                <p className="font-medium text-gray-900">{building.year_built}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-gray-500">Construction:</span>
+                                <p className="font-medium text-gray-900">{building.construction_type}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Material:</span>
+                                <p className="font-medium text-gray-900">{building.material_type}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="pt-3 border-t border-gray-200">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Market Value:</span>
+                                  <p className="font-medium text-gray-900">{formatCurrency(building.building_market_value)}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Assessed Value:</span>
+                                  <p className="font-medium text-gray-900">{formatCurrency(building.building_assessed_value)}</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-blue-50 rounded-lg p-3 mt-3">
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-blue-600">{formatCurrency(building.annual_tax)}</div>
+                                <div className="text-xs text-blue-600">Annual Building Tax</div>
                               </div>
                             </div>
                           </div>
-                          
-                          <div className="bg-blue-50 rounded-lg p-3 mt-3">
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-blue-600">{formatCurrency(building.annual_tax)}</div>
-                              <div className="text-xs text-blue-600">Annual Building Tax</div>
-                            </div>
-                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Buildings Found</h3>
-                    <p className="text-gray-500">This property doesn't have any registered buildings.</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Buildings</h3>
+                    <p className="text-gray-500">This property is a vacant land with no registered buildings.</p>
                   </div>
                 )}
               </div>

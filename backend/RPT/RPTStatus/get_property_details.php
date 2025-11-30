@@ -25,12 +25,13 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 $property_id = $_GET['id'];
 
 try {
-    // Get basic property information
+    // Get basic property information - FIXED: Added annual_tax field
     $query = "
         SELECT 
             pr.*,
             po.*,
             lp.*,
+            lp.annual_tax as land_annual_tax,  -- This line was added
             pt.total_annual_tax,
             pt.approval_date,
             lp.tdn as land_tdn,

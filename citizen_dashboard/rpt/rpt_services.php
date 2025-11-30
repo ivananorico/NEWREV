@@ -77,7 +77,7 @@ $user_name = $_SESSION['user_name'] ?? 'Citizen';
             </a>
 
             <!-- RPT Tax Payment Card -->
-            <a href="rpt_tax_payment.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-blue-500 hover:scale-105 cursor-pointer block">
+            <a href="rpt_tax_payment/rpt_tax_payment.php" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border-l-4 border-blue-500 hover:scale-105 cursor-pointer block">
                 <div class="flex items-center justify-between mb-4">
                     <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                         <i class="fas fa-credit-card text-blue-600 text-xl"></i>

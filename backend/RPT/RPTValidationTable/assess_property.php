@@ -51,34 +51,59 @@ try {
     $land_basic_tax = $land_annual_tax * 0.5; // 50% of total tax
     $land_sef_tax = $land_annual_tax * 0.5;   // 50% of total tax
 
-    // Update or insert land assessment
-    $land_query = "
-        INSERT INTO land_properties 
-        (registration_id, inspection_id, property_type, land_config_id, 
-         land_area_sqm, land_market_value, land_assessed_value, assessment_level,
-         basic_tax_config_id, sef_tax_config_id, basic_tax_amount, sef_tax_amount, annual_tax)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-        property_type = VALUES(property_type),
-        land_area_sqm = VALUES(land_area_sqm),
-        land_market_value = VALUES(land_market_value),
-        land_assessed_value = VALUES(land_assessed_value),
-        assessment_level = VALUES(assessment_level),
-        basic_tax_config_id = VALUES(basic_tax_config_id),
-        sef_tax_config_id = VALUES(sef_tax_config_id),
-        basic_tax_amount = VALUES(basic_tax_amount),
-        sef_tax_amount = VALUES(sef_tax_amount),
-        annual_tax = VALUES(annual_tax)
-    ";
-    
-    $land_stmt = $pdo->prepare($land_query);
-    $land_stmt->execute([
-        $registration_id, $inspection_id, $input['land_property_type'], $land_config_id,
-        $input['land_area_sqm'], $input['land_market_value'], $input['land_assessed_value'], $input['land_assessment_level'],
-        $basic_tax_id, $sef_tax_id, $land_basic_tax, $land_sef_tax, $land_annual_tax
-    ]);
-    
-    $land_id = $pdo->lastInsertId();
+    // Check if land assessment already exists for this registration
+    $check_land_stmt = $pdo->prepare("SELECT id FROM land_properties WHERE registration_id = ?");
+    $check_land_stmt->execute([$registration_id]);
+    $existing_land_id = $check_land_stmt->fetch(PDO::FETCH_COLUMN);
+
+    if ($existing_land_id) {
+        // UPDATE existing land assessment
+        $land_query = "
+            UPDATE land_properties SET
+            property_type = ?,
+            land_config_id = ?,
+            land_area_sqm = ?,
+            land_market_value = ?,
+            land_assessed_value = ?,
+            assessment_level = ?,
+            basic_tax_config_id = ?,
+            sef_tax_config_id = ?,
+            basic_tax_amount = ?,
+            sef_tax_amount = ?,
+            annual_tax = ?
+            WHERE registration_id = ?
+        ";
+        
+        $land_stmt = $pdo->prepare($land_query);
+        $land_stmt->execute([
+            $input['land_property_type'], $land_config_id,
+            $input['land_area_sqm'], $input['land_market_value'], $input['land_assessed_value'], $input['land_assessment_level'],
+            $basic_tax_id, $sef_tax_id, $land_basic_tax, $land_sef_tax, $land_annual_tax,
+            $registration_id
+        ]);
+        
+        $land_id = $existing_land_id;
+        $land_action = 'updated';
+    } else {
+        // INSERT new land assessment
+        $land_query = "
+            INSERT INTO land_properties 
+            (registration_id, inspection_id, property_type, land_config_id, 
+             land_area_sqm, land_market_value, land_assessed_value, assessment_level,
+             basic_tax_config_id, sef_tax_config_id, basic_tax_amount, sef_tax_amount, annual_tax)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ";
+        
+        $land_stmt = $pdo->prepare($land_query);
+        $land_stmt->execute([
+            $registration_id, $inspection_id, $input['land_property_type'], $land_config_id,
+            $input['land_area_sqm'], $input['land_market_value'], $input['land_assessed_value'], $input['land_assessment_level'],
+            $basic_tax_id, $sef_tax_id, $land_basic_tax, $land_sef_tax, $land_annual_tax
+        ]);
+        
+        $land_id = $pdo->lastInsertId();
+        $land_action = 'inserted';
+    }
 
     // Handle building assessment if property has building
     $building_action = 'none';
@@ -95,71 +120,119 @@ try {
         $building_basic_tax = $building_annual_tax * 0.5; // 50% of total tax
         $building_sef_tax = $building_annual_tax * 0.5;   // 50% of total tax
 
-        $building_query = "
-            INSERT INTO building_properties 
-            (land_id, inspection_id, construction_type, property_config_id,
-             floor_area_sqm, year_built, building_market_value, building_depreciated_value,
-             depreciation_percent, building_assessed_value, assessment_level,
-             basic_tax_config_id, sef_tax_config_id, basic_tax_amount, sef_tax_amount, annual_tax)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-            construction_type = VALUES(construction_type),
-            floor_area_sqm = VALUES(floor_area_sqm),
-            year_built = VALUES(year_built),
-            building_market_value = VALUES(building_market_value),
-            building_depreciated_value = VALUES(building_depreciated_value),
-            depreciation_percent = VALUES(depreciation_percent),
-            building_assessed_value = VALUES(building_assessed_value),
-            assessment_level = VALUES(assessment_level),
-            basic_tax_config_id = VALUES(basic_tax_config_id),
-            sef_tax_config_id = VALUES(sef_tax_config_id),
-            basic_tax_amount = VALUES(basic_tax_amount),
-            sef_tax_amount = VALUES(sef_tax_amount),
-            annual_tax = VALUES(annual_tax)
-        ";
-        
-        $building_stmt = $pdo->prepare($building_query);
-        $building_stmt->execute([
-            $land_id, $inspection_id, $input['construction_type'], $property_config_id,
-            $input['floor_area_sqm'], $input['year_built'], $input['building_market_value'], $input['building_depreciated_value'],
-            $input['depreciation_percent'], $input['building_assessed_value'], $input['building_assessment_level'],
-            $basic_tax_id, $sef_tax_id, $building_basic_tax, $building_sef_tax, $building_annual_tax
-        ]);
-        
-        $building_action = $building_stmt->rowCount() > 0 ? 'updated' : 'inserted';
+        // Check if building assessment already exists for this land
+        $check_building_stmt = $pdo->prepare("SELECT id FROM building_properties WHERE land_id = ?");
+        $check_building_stmt->execute([$land_id]);
+        $existing_building_id = $check_building_stmt->fetch(PDO::FETCH_COLUMN);
+
+        if ($existing_building_id) {
+            // UPDATE existing building assessment
+            $building_query = "
+                UPDATE building_properties SET
+                construction_type = ?,
+                property_config_id = ?,
+                floor_area_sqm = ?,
+                year_built = ?,
+                building_market_value = ?,
+                building_depreciated_value = ?,
+                depreciation_percent = ?,
+                building_assessed_value = ?,
+                assessment_level = ?,
+                basic_tax_config_id = ?,
+                sef_tax_config_id = ?,
+                basic_tax_amount = ?,
+                sef_tax_amount = ?,
+                annual_tax = ?
+                WHERE land_id = ?
+            ";
+            
+            $building_stmt = $pdo->prepare($building_query);
+            $building_stmt->execute([
+                $input['construction_type'], $property_config_id,
+                $input['floor_area_sqm'], $input['year_built'], $input['building_market_value'], $input['building_depreciated_value'],
+                $input['depreciation_percent'], $input['building_assessed_value'], $input['building_assessment_level'],
+                $basic_tax_id, $sef_tax_id, $building_basic_tax, $building_sef_tax, $building_annual_tax,
+                $land_id
+            ]);
+            
+            $building_action = 'updated';
+        } else {
+            // INSERT new building assessment
+            $building_query = "
+                INSERT INTO building_properties 
+                (land_id, inspection_id, construction_type, property_config_id,
+                 floor_area_sqm, year_built, building_market_value, building_depreciated_value,
+                 depreciation_percent, building_assessed_value, assessment_level,
+                 basic_tax_config_id, sef_tax_config_id, basic_tax_amount, sef_tax_amount, annual_tax)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ";
+            
+            $building_stmt = $pdo->prepare($building_query);
+            $building_stmt->execute([
+                $land_id, $inspection_id, $input['construction_type'], $property_config_id,
+                $input['floor_area_sqm'], $input['year_built'], $input['building_market_value'], $input['building_depreciated_value'],
+                $input['depreciation_percent'], $input['building_assessed_value'], $input['building_assessment_level'],
+                $basic_tax_id, $sef_tax_id, $building_basic_tax, $building_sef_tax, $building_annual_tax
+            ]);
+            
+            $building_action = 'inserted';
+        }
     }
 
-    // Create or update property_totals (for display purposes, status remains assessed)
+    // Handle property_totals - UPDATE if exists, INSERT if not
     $total_annual_tax = $land_annual_tax + $building_annual_tax;
     
-    $totals_query = "
-        INSERT INTO property_totals 
-        (registration_id, land_id, land_annual_tax, total_building_annual_tax, total_annual_tax, status)
-        VALUES (?, ?, ?, ?, ?, 'active')
-        ON DUPLICATE KEY UPDATE
-        land_annual_tax = VALUES(land_annual_tax),
-        total_building_annual_tax = VALUES(total_building_annual_tax),
-        total_annual_tax = VALUES(total_annual_tax),
-        status = VALUES(status)
-    ";
-    
-    $totals_stmt = $pdo->prepare($totals_query);
-    $totals_stmt->execute([
-        $registration_id, 
-        $land_id,
-        $land_annual_tax,
-        $building_annual_tax,
-        $total_annual_tax
-    ]);
+    $check_totals_stmt = $pdo->prepare("SELECT id FROM property_totals WHERE registration_id = ?");
+    $check_totals_stmt->execute([$registration_id]);
+    $existing_totals_id = $check_totals_stmt->fetch(PDO::FETCH_COLUMN);
 
-    // Update registration status to assessed
-    $status_stmt = $pdo->prepare("UPDATE property_registrations SET status = 'assessed' WHERE id = ?");
+    if ($existing_totals_id) {
+        // UPDATE existing totals
+        $totals_query = "
+            UPDATE property_totals SET
+            land_annual_tax = ?,
+            total_building_annual_tax = ?,
+            total_annual_tax = ?,
+            status = 'active'
+            WHERE registration_id = ?
+        ";
+        
+        $totals_stmt = $pdo->prepare($totals_query);
+        $totals_stmt->execute([
+            $land_annual_tax,
+            $building_annual_tax,
+            $total_annual_tax,
+            $registration_id
+        ]);
+    } else {
+        // INSERT new totals
+        $totals_query = "
+            INSERT INTO property_totals 
+            (registration_id, land_id, land_annual_tax, total_building_annual_tax, total_annual_tax, status)
+            VALUES (?, ?, ?, ?, ?, 'active')
+        ";
+        
+        $totals_stmt = $pdo->prepare($totals_query);
+        $totals_stmt->execute([
+            $registration_id, 
+            $land_id,
+            $land_annual_tax,
+            $building_annual_tax,
+            $total_annual_tax
+        ]);
+    }
+
+    // Update registration status to assessed (only if not already approved)
+    $status_stmt = $pdo->prepare("UPDATE property_registrations SET status = 'assessed' WHERE id = ? AND status != 'approved'");
     $status_stmt->execute([$registration_id]);
 
     echo json_encode([
         'status' => 'success',
         'message' => 'Property assessment saved successfully',
-        'action' => $building_action !== 'none' ? 'Land and building assessment saved' : 'Land assessment saved',
+        'action' => [
+            'land' => $land_action,
+            'building' => $building_action !== 'none' ? $building_action : 'none'
+        ],
         'land_annual_tax' => $land_annual_tax,
         'building_annual_tax' => $building_annual_tax,
         'total_annual_tax' => $total_annual_tax
