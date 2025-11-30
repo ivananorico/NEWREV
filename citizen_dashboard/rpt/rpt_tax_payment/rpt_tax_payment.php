@@ -188,7 +188,7 @@ include_once '../../../db/RPT/rpt_db.php';
                                             } else {
                                                 $totalAmount = $tax['total_quarterly_tax'] + $tax['penalty_amount'];
                                                 echo '
-                                            <button onclick="openPaymentModal(' . $tax['id'] . ', ' . $totalAmount . ', \'' . $tax['quarter'] . ' ' . $tax['year'] . '\')" 
+                                            <button onclick="initiatePayment(' . $tax['id'] . ', ' . $totalAmount . ', \'' . $tax['quarter'] . ' ' . $tax['year'] . ' RPT Tax\')" 
                                                     class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors">
                                                 <i class="fas fa-credit-card mr-2"></i>Pay ₱' . number_format($totalAmount, 2) . '
                                             </button>';
@@ -220,95 +220,34 @@ include_once '../../../db/RPT/rpt_db.php';
             ?>
         </div>
     </main>
+<script>
+function initiatePayment(taxId, amount, purpose) {
+    // Prepare data for digital payment
+    const paymentData = {
+        client_system: 'rpt',
+        client_reference: 'RPT-' + taxId.toString(),
+        purpose: purpose,
+        amount: amount
+    };
+    
+    // Send to payment method selection
+    const encodedData = btoa(JSON.stringify(paymentData));
+    window.location.href = '/revenue/citizen_dashboard/digital/payment_method.php?data=' + encodedData;
+}
 
-    <!-- Payment Modal -->
-    <div id="paymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-semibold text-gray-800">Confirm Payment</h3>
-                <button onclick="closePaymentModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="space-y-4">
-                <div class="bg-blue-50 rounded-lg p-4">
-                    <div class="text-center">
-                        <div id="paymentQuarter" class="text-lg font-semibold text-blue-800 mb-1"></div>
-                        <div id="paymentAmount" class="text-2xl font-bold text-blue-600"></div>
-                    </div>
-                </div>
-                
-                <div class="space-y-3">
-                    <h4 class="font-semibold text-gray-700">Payment Method</h4>
-                    <div class="space-y-2">
-                        <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                            <input type="radio" name="paymentMethod" value="gcash" class="mr-3" checked>
-                            <i class="fab fa-google-wallet text-green-600 text-xl mr-2"></i>
-                            <span class="font-medium">GCash</span>
-                        </label>
-                        <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                            <input type="radio" name="paymentMethod" value="paymaya" class="mr-3">
-                            <i class="fas fa-mobile-alt text-blue-600 text-xl mr-2"></i>
-                            <span class="font-medium">PayMaya</span>
-                        </label>
-                        <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                            <input type="radio" name="paymentMethod" value="bank" class="mr-3">
-                            <i class="fas fa-university text-purple-600 text-xl mr-2"></i>
-                            <span class="font-medium">Bank Transfer</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="flex space-x-3 pt-4">
-                    <button onclick="closePaymentModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-3 rounded-lg font-medium transition-colors">
-                        Cancel
-                    </button>
-                    <button onclick="processPayment()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        <i class="fas fa-lock mr-2"></i>Pay Now
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let currentTaxId = null;
-        
-        function openPaymentModal(taxId, amount, quarter) {
-            currentTaxId = taxId;
-            document.getElementById('paymentQuarter').textContent = quarter;
-            document.getElementById('paymentAmount').textContent = '₱' + amount.toLocaleString('en-PH', {minimumFractionDigits: 2});
-            document.getElementById('paymentModal').classList.remove('hidden');
-        }
-        
-        function closePaymentModal() {
-            document.getElementById('paymentModal').classList.add('hidden');
-            currentTaxId = null;
-        }
-        
-        function processPayment() {
-            const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
-            
-            // Show loading state
-            const payButton = document.querySelector('#paymentModal button:last-child');
-            payButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
-            payButton.disabled = true;
-            
-            // Simulate payment processing
-            setTimeout(() => {
-                alert('Payment processed successfully!');
-                closePaymentModal();
-                location.reload(); // Refresh to update payment status
-            }, 2000);
-        }
-        
-        // Close modal when clicking outside
-        document.getElementById('paymentModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closePaymentModal();
-            }
-        });
-    </script>
+// Check for payment completion when returning to RPT page
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('payment_success')) {
+        alert('Payment completed successfully!');
+        // Remove the parameter from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        // Refresh the page to show updated status
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    }
+});
+</script>
 </body>
 </html>
