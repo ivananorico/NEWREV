@@ -116,21 +116,19 @@ if (!$paymentData) {
 
     <script>
     function selectPaymentMethod(method) {
-        const paymentData = <?php echo json_encode($paymentData); ?>;
-        paymentData.payment_method = method;
-        
-        // Redirect to payment verification
-        const encodedData = btoa(JSON.stringify(paymentData));
-        window.location.href = 'payment_verification.php?data=' + encodedData;
+    const paymentData = <?php echo json_encode($paymentData); ?>;
+    paymentData.payment_method = method;
+    
+    const encodedData = btoa(JSON.stringify(paymentData));
+    
+    // Redirect to specific pages based on payment method
+    if (method === 'gcash') {
+        window.location.href = 'gcash_verification.php?data=' + encodedData;
+    } else if (method === 'paymaya') {
+        window.location.href = 'paymaya_verification.php?data=' + encodedData;
     }
-
-    function goBack() {
-        if (document.referrer) {
-            window.history.back();
-        } else {
-            window.close();
-        }
-    }
+    // Add more methods as needed
+}
     </script>
 </body>
 </html>

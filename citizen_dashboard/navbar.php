@@ -1,6 +1,15 @@
 <?php
-// navbar.php
+// revenue/citizen_dashboard/navbar.php
 
+// Remove session_start() since it's already called in the parent file
+// Just check if session exists and get user info
+
+// Check if session is not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Only redirect if user_id is not set
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../index.php');
     exit();
@@ -9,21 +18,31 @@ if (!isset($_SESSION['user_id'])) {
 $user_name = $_SESSION['user_name'] ?? 'Citizen';
 $user_email = $_SESSION['user_email'] ?? '';
 
-// Get current page for active state
-$current_page = basename($_SERVER['PHP_SELF']);
+// Function to get the correct base path
+function getBasePath() {
+    // Get current URL path
+    $current_path = $_SERVER['PHP_SELF'];
+    
+    // Check which directory we're in
+    if (strpos($current_path, 'rpt/rpt_registration') !== false || 
+        strpos($current_path, 'rpt/rpt_application') !== false) {
+        // If in rpt/rpt_registration/ or rpt/rpt_application/, go up 2 levels
+        return '../../';
+    } elseif (strpos($current_path, 'rpt') !== false) {
+        // If in rpt/, go up 1 level
+        return '../';
+    } else {
+        // If in citizen_dashboard/ directly
+        return './';
+    }
+}
 
-// Determine base URL dynamically
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-$host = $_SERVER['HTTP_HOST'];
-$base_url = $protocol . "://" . $host;
+$base_path = getBasePath();
 
-// Get the current directory structure
-$script_path = $_SERVER['SCRIPT_NAME'];
-$script_dir = dirname($script_path);
-
-// Build the base path for the citizen dashboard
-$base_path = rtrim($base_url . $script_dir, '/');
-$base_path = str_replace('/rpt', '', $base_path); // Remove any /rpt subdirectory
+// Set all paths
+$logout_path = $base_path . 'logout.php';
+$dashboard_path = $base_path . 'citizen_dashboard.php';
+$settings_path = $base_path . 'settings.php';
 ?>
 <style>
 :root {
@@ -111,7 +130,7 @@ $base_path = str_replace('/rpt', '', $base_path); // Remove any /rpt subdirector
 
             <!-- Logo and Brand -->
             <div class="flex items-center space-x-3">
-                <a href="<?php echo $base_path; ?>/citizen_dashboard.php" class="flex items-center space-x-3 no-underline">
+                <a href="<?php echo $dashboard_path; ?>" class="flex items-center space-x-3 no-underline">
                     <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: #4A90E2;">
                         <i class="fas fa-user-tie text-white text-sm"></i>
                     </div>
@@ -145,11 +164,11 @@ $base_path = str_replace('/rpt', '', $base_path); // Remove any /rpt subdirector
 
                     <!-- Dropdown Menu -->
                     <div class="dropdown-menu">
-                        <a href="<?php echo $base_path; ?>/settings.php" class="dropdown-link settings">
+                        <a href="<?php echo $settings_path; ?>" class="dropdown-link settings">
                             <i class="fas fa-user-cog mr-2"></i>Profile & Settings
                         </a>
                         <div class="divider"></div>
-                        <a href="<?php echo $base_path; ?>/logout.php" class="dropdown-link logout">
+                        <a href="<?php echo $logout_path; ?>" class="dropdown-link logout">
                             <i class="fas fa-sign-out-alt mr-2"></i>Logout
                         </a>
                     </div>
