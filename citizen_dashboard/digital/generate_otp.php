@@ -35,17 +35,23 @@ try {
     // Generate OTP (6 digits)
     $otp_code = sprintf('%06d', rand(0, 999999));
     
-    // Set webhook URL based on client system
+    // Set webhook URL based on client system - FIXED URL
     $webhook_url = getWebhookUrl($data['client_system']);
     
-    // Insert into payment_transactions
+    if (!$webhook_url) {
+        throw new Exception("No webhook URL configured for system: " . $data['client_system']);
+    }
+    
+    error_log("Using webhook URL: " . $webhook_url);
+    
+    // Insert into payment_transactions - NO updated_at column
     $stmt = $pdo->prepare("
         INSERT INTO payment_transactions (
             payment_id, client_system, client_reference, purpose, amount, 
-            phone, payment_method, webhook_url, otp_code, created_at
+            phone, payment_method, webhook_url, otp_code, payment_status, created_at
         ) VALUES (
             :payment_id, :client_system, :client_reference, :purpose, :amount,
-            :phone, :payment_method, :webhook_url, :otp_code, NOW()
+            :phone, :payment_method, :webhook_url, :otp_code, 'pending', NOW()
         )
     ");
     
@@ -75,27 +81,31 @@ try {
         'status' => 'success',
         'message' => 'OTP sent successfully',
         'payment_id' => $payment_id,
-        'otp_code' => $otp_code // Remove this in production
+        'otp_code' => $otp_code, // Remove this in production
+        'webhook_url' => $webhook_url
     ]);
     
 } catch (PDOException $e) {
     error_log("Generate OTP PDO Error: " . $e->getMessage());
     echo json_encode([
         'status' => 'error',
-        'message' => 'Database error occurred'
+        'message' => 'Database error occurred: ' . $e->getMessage()
     ]);
 } catch (Exception $e) {
     error_log("Generate OTP Error: " . $e->getMessage());
     echo json_encode([
         'status' => 'error',
-        'message' => 'Failed to generate OTP'
+        'message' => $e->getMessage()
     ]);
 }
 
 function getWebhookUrl($clientSystem) {
+    // FIXED: Use correct base URL for your setup
+    $base_url = 'http://localhost'; // Or your actual domain
+    
     $webhooks = [
-        'rpt' => 'http://localhost/revenue/citizen_dashboard/rpt/rpt_tax_payment/rpt_webhook.php',
-        'business_permit' => 'http://localhost/revenue/citizen_dashboard/business_permit/webhook.php',
+        'rpt' => $base_url . '/revenue/citizen_dashboard/rpt/rpt_tax_payment/rpt_webhook.php',
+        // Add other systems if needed
     ];
     
     return $webhooks[$clientSystem] ?? null;
