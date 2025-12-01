@@ -6,11 +6,22 @@ export default function BUSINESS1() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Business Configuration State
+  // Business Configuration State (Gross Sales/Receipts)
   const [businessConfigs, setBusinessConfigs] = useState([]);
   const [businessForm, setBusinessForm] = useState({
     business_type: '',
     tax_rate: '',
+    effective_date: new Date().toISOString().split('T')[0],
+    expiration_date: '',
+    remarks: ''
+  });
+
+  // Capital Investment Configuration State
+  const [capitalConfigs, setCapitalConfigs] = useState([]);
+  const [capitalForm, setCapitalForm] = useState({
+    min_capital: '',
+    max_capital: '',
+    tax_percent: '',
     effective_date: new Date().toISOString().split('T')[0],
     expiration_date: '',
     remarks: ''
@@ -27,7 +38,7 @@ export default function BUSINESS1() {
     remarks: ''
   });
 
-  // Penalty Configuration State (Simplified - following RPT pattern)
+  // Penalty Configuration State
   const [penaltyConfigs, setPenaltyConfigs] = useState([]);
   const [penaltyForm, setPenaltyForm] = useState({
     penalty_percent: '',
@@ -36,7 +47,7 @@ export default function BUSINESS1() {
     remarks: ''
   });
 
-  // Discount Configuration State (Simplified - following RPT pattern)
+  // Discount Configuration State
   const [discountConfigs, setDiscountConfigs] = useState([]);
   const [discountForm, setDiscountForm] = useState({
     discount_percent: '',
@@ -64,6 +75,17 @@ export default function BUSINESS1() {
       setError('Failed to load business configurations: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCapitalConfigs = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/capital-configurations.php?current_date=${currentDate}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setCapitalConfigs(data);
+    } catch (error) {
+      console.error('Error fetching capital configurations:', error);
     }
   };
 
@@ -102,6 +124,7 @@ export default function BUSINESS1() {
 
   useEffect(() => {
     fetchBusinessConfigs();
+    fetchCapitalConfigs();
     fetchRegulatoryConfigs();
     fetchPenaltyConfigs();
     fetchDiscountConfigs();
@@ -130,7 +153,7 @@ export default function BUSINESS1() {
       if (response.ok) {
         fetchBusinessConfigs();
         resetBusinessForm();
-        alert(editingId ? 'Business configuration updated successfully!' : 'Business configuration created successfully!');
+        alert(editingId ? 'Business tax updated successfully!' : 'Business tax created successfully!');
       } else {
         alert('Error: ' + result.error);
       }
@@ -150,6 +173,58 @@ export default function BUSINESS1() {
     });
     setEditingId(config.id);
     setEditingType('business');
+  };
+
+  // Capital Investment Configuration Handlers
+  const handleCapitalSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingId 
+      ? `${API_BASE}/capital-configurations.php?id=${editingId}`
+      : `${API_BASE}/capital-configurations.php`;
+    
+    const method = editingId ? 'PUT' : 'POST';
+
+    // Validate that min capital is less than max capital
+    if (parseFloat(capitalForm.min_capital) >= parseFloat(capitalForm.max_capital)) {
+      alert('Minimum capital must be less than maximum capital');
+      return;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(capitalForm)
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        fetchCapitalConfigs();
+        resetCapitalForm();
+        alert(editingId ? 'Capital investment tax updated successfully!' : 'Capital investment tax created successfully!');
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error saving capital configuration:', error);
+      alert('Error saving capital configuration');
+    }
+  };
+
+  const handleCapitalEdit = (config) => {
+    setCapitalForm({
+      min_capital: config.min_capital || '',
+      max_capital: config.max_capital || '',
+      tax_percent: config.tax_percent || '',
+      effective_date: config.effective_date || new Date().toISOString().split('T')[0],
+      expiration_date: config.expiration_date || '',
+      remarks: config.remarks || ''
+    });
+    setEditingId(config.id);
+    setEditingType('capital');
   };
 
   // Regulatory Configuration Handlers
@@ -288,7 +363,8 @@ export default function BUSINESS1() {
 
   // Common Handlers
   const handleDelete = async (id, type) => {
-    const typeName = type === 'business' ? 'business configuration' : 
+    const typeName = type === 'business' ? 'business tax' : 
+                    type === 'capital' ? 'capital investment tax' :
                     type === 'regulatory' ? 'regulatory configuration' :
                     type === 'penalty' ? 'penalty configuration' : 'discount configuration';
     
@@ -303,6 +379,9 @@ export default function BUSINESS1() {
           switch (type) {
             case 'business':
               fetchBusinessConfigs();
+              break;
+            case 'capital':
+              fetchCapitalConfigs();
               break;
             case 'regulatory':
               fetchRegulatoryConfigs();
@@ -324,7 +403,8 @@ export default function BUSINESS1() {
   };
 
   const handleExpire = async (id, type) => {
-    const typeName = type === 'business' ? 'business configuration' : 
+    const typeName = type === 'business' ? 'business tax' : 
+                    type === 'capital' ? 'capital investment tax' :
                     type === 'regulatory' ? 'regulatory configuration' :
                     type === 'penalty' ? 'penalty configuration' : 'discount configuration';
     
@@ -345,6 +425,9 @@ export default function BUSINESS1() {
           switch (type) {
             case 'business':
               fetchBusinessConfigs();
+              break;
+            case 'capital':
+              fetchCapitalConfigs();
               break;
             case 'regulatory':
               fetchRegulatoryConfigs();
@@ -370,6 +453,19 @@ export default function BUSINESS1() {
     setBusinessForm({
       business_type: '',
       tax_rate: '',
+      effective_date: new Date().toISOString().split('T')[0],
+      expiration_date: '',
+      remarks: ''
+    });
+    setEditingId(null);
+    setEditingType(null);
+  };
+
+  const resetCapitalForm = () => {
+    setCapitalForm({
+      min_capital: '',
+      max_capital: '',
+      tax_percent: '',
       effective_date: new Date().toISOString().split('T')[0],
       expiration_date: '',
       remarks: ''
@@ -416,6 +512,8 @@ export default function BUSINESS1() {
   // Statistics
   const activeBusinessConfigs = businessConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
   const expiredBusinessConfigs = businessConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
+  const activeCapitalConfigs = capitalConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
+  const expiredCapitalConfigs = capitalConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
   const activeRegulatoryConfigs = regulatoryConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
   const expiredRegulatoryConfigs = regulatoryConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
   const activePenaltyConfigs = penaltyConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
@@ -446,17 +544,18 @@ export default function BUSINESS1() {
       {/* Tab Navigation */}
       <div className="mb-6 border-b border-gray-200 dark:border-slate-700">
         <nav className="-mb-px flex space-x-8">
-          {['business', 'regulatory', 'penalty', 'discount'].map((tab) => (
+          {['business', 'capital', 'regulatory', 'penalty', 'discount'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm capitalize ${
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
               }`}
             >
-              {tab === 'business' ? 'Business Tax' : 
+              {tab === 'business' ? 'Gross Sales Tax' : 
+               tab === 'capital' ? 'Capital Investment Tax' :
                tab === 'regulatory' ? 'Regulatory Fees' :
                tab === 'penalty' ? 'Penalties' : 'Discounts'}
             </button>
@@ -479,11 +578,16 @@ export default function BUSINESS1() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-          <h3 className="font-semibold text-blue-800 dark:text-blue-300">Business Tax</h3>
+          <h3 className="font-semibold text-blue-800 dark:text-blue-300">Gross Sales Tax</h3>
           <p className="text-2xl font-bold">{businessConfigs.length}</p>
           <p className="text-sm">Active: {activeBusinessConfigs} | Expired: {expiredBusinessConfigs}</p>
+        </div>
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
+          <h3 className="font-semibold text-indigo-800 dark:text-indigo-300">Capital Investment Tax</h3>
+          <p className="text-2xl font-bold">{capitalConfigs.length}</p>
+          <p className="text-sm">Active: {activeCapitalConfigs} | Expired: {expiredCapitalConfigs}</p>
         </div>
         <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-green-800 dark:text-green-300">Regulatory Fees</h3>
@@ -510,13 +614,13 @@ export default function BUSINESS1() {
         </div>
       )}
 
-      {/* Business Configuration Tab */}
+      {/* Business Configuration Tab (Gross Sales Tax) */}
       {activeTab === 'business' && !loading && (
         <>
           {/* Business Configuration Form */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">
-              {editingType === 'business' ? 'Edit Business Tax Configuration' : 'Add New Business Tax Configuration'}
+              {editingType === 'business' ? 'Edit Gross Sales Tax' : 'Add New Gross Sales Tax'}
             </h2>
             <form onSubmit={handleBusinessSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -541,7 +645,7 @@ export default function BUSINESS1() {
                   value={businessForm.tax_rate}
                   onChange={(e) => setBusinessForm({...businessForm, tax_rate: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="0.00"
+                  placeholder="e.g., 2.00 for 2%"
                   required
                 />
               </div>
@@ -573,7 +677,7 @@ export default function BUSINESS1() {
                 <textarea
                   value={businessForm.remarks}
                   onChange={(e) => setBusinessForm({...businessForm, remarks: e.target.value})}
-                  rows="3"
+                  rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional notes about this business tax configuration..."
                 />
@@ -582,7 +686,7 @@ export default function BUSINESS1() {
               {/* Tax Preview */}
               {businessForm.tax_rate && (
                 <div className="md:col-span-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <h4 className="font-medium mb-2">Tax Rate Preview</h4>
+                  <h4 className="font-medium mb-2">Tax Calculation Preview</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-medium">Business Type:</span>
@@ -593,6 +697,9 @@ export default function BUSINESS1() {
                       <div className="text-lg">{businessForm.tax_rate}%</div>
                     </div>
                   </div>
+                  <p className="text-sm mt-2">
+                    Example: For ₱100,000 gross sales = ₱{(100000 * (parseFloat(businessForm.tax_rate || 0) / 100)).toFixed(2)}
+                  </p>
                 </div>
               )}
 
@@ -602,7 +709,7 @@ export default function BUSINESS1() {
                   type="submit"
                   className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
                 >
-                  {editingType === 'business' ? 'Update Business Tax' : 'Create Business Tax'}
+                  {editingType === 'business' ? 'Update Gross Sales Tax' : 'Create Gross Sales Tax'}
                 </button>
                 <button
                   type="button"
@@ -618,12 +725,12 @@ export default function BUSINESS1() {
           {/* Business Configurations List */}
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              Business Tax Configurations ({businessConfigs.length})
+              Gross Sales Tax Rates ({businessConfigs.length})
             </h2>
             
             {businessConfigs.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                No business tax configurations found for the selected date.
+                No gross sales tax rates found for the selected date.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -704,7 +811,225 @@ export default function BUSINESS1() {
         </>
       )}
 
-      {/* Regulatory Configuration Tab */}
+      {/* Capital Investment Tax Tab */}
+      {activeTab === 'capital' && !loading && (
+        <>
+          {/* Capital Investment Tax Form */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">
+              {editingType === 'capital' ? 'Edit Capital Investment Tax' : 'Add New Capital Investment Tax'}
+            </h2>
+            <form onSubmit={handleCapitalSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Minimum Capital (₱) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={capitalForm.min_capital}
+                  onChange={(e) => setCapitalForm({...capitalForm, min_capital: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="e.g., 0.00"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Maximum Capital (₱) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={capitalForm.max_capital}
+                  onChange={(e) => setCapitalForm({...capitalForm, max_capital: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="e.g., 5000.00"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Tax Percentage (%) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={capitalForm.tax_percent}
+                  onChange={(e) => setCapitalForm({...capitalForm, tax_percent: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="e.g., 0.25 for 0.25%"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Effective Date *</label>
+                <input
+                  type="date"
+                  value={capitalForm.effective_date}
+                  onChange={(e) => setCapitalForm({...capitalForm, effective_date: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Expiration Date</label>
+                <input
+                  type="date"
+                  value={capitalForm.expiration_date}
+                  onChange={(e) => setCapitalForm({...capitalForm, expiration_date: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium mb-2">Remarks</label>
+                <textarea
+                  value={capitalForm.remarks}
+                  onChange={(e) => setCapitalForm({...capitalForm, remarks: e.target.value})}
+                  rows="2"
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="Additional notes about this capital investment tax..."
+                />
+              </div>
+
+              {/* Tax Calculation Preview */}
+              {capitalForm.min_capital && capitalForm.max_capital && capitalForm.tax_percent && (
+                <div className="md:col-span-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                  <h4 className="font-medium mb-2">Tax Calculation Preview</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Capital Range:</span>
+                      <div className="text-lg">₱{parseFloat(capitalForm.min_capital).toLocaleString()} - ₱{parseFloat(capitalForm.max_capital).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Tax Rate:</span>
+                      <div className="text-lg">{capitalForm.tax_percent}%</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Example Tax:</span>
+                      <div className="text-lg">
+                        ₱{parseFloat(capitalForm.max_capital).toLocaleString()} capital × {capitalForm.tax_percent}% = ₱{(parseFloat(capitalForm.max_capital) * (parseFloat(capitalForm.tax_percent) / 100)).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Actions */}
+              <div className="md:col-span-3 flex gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                >
+                  {editingType === 'capital' ? 'Update Capital Tax' : 'Create Capital Tax'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetCapitalForm}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Capital Investment Tax List */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">
+              Capital Investment Tax Brackets ({capitalConfigs.length})
+            </h2>
+            
+            {capitalConfigs.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No capital investment tax brackets found for the selected date.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300 dark:border-slate-700">
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-slate-800">
+                      <th className="border p-2 text-left">Capital Range</th>
+                      <th className="border p-2 text-left">Tax Rate</th>
+                      <th className="border p-2 text-left">Effective Date</th>
+                      <th className="border p-2 text-left">Expiration Date</th>
+                      <th className="border p-2 text-left">Status</th>
+                      <th className="border p-2 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {capitalConfigs.map((config) => {
+                      const isExpired = config.expiration_date && new Date(config.expiration_date) <= new Date();
+                      return (
+                        <tr 
+                          key={config.id} 
+                          className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${
+                            isExpired ? 'bg-gray-50 dark:bg-slate-800/50 text-gray-500' : ''
+                          }`}
+                        >
+                          <td className="border p-2">
+                            <div className="font-medium">
+                              ₱{parseFloat(config.min_capital).toLocaleString()} - ₱{parseFloat(config.max_capital).toLocaleString()}
+                            </div>
+                            {config.remarks && (
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {config.remarks}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border p-2">{config.tax_percent}%</td>
+                          <td className="border p-2">{config.effective_date}</td>
+                          <td className="border p-2">{config.expiration_date || '-'}</td>
+                          <td className="border p-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              !isExpired 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                            }`}>
+                              {isExpired ? 'Expired' : 'Active'}
+                            </span>
+                          </td>
+                          <td className="border p-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleCapitalEdit(config)}
+                                className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
+                                disabled={isExpired}
+                              >
+                                Edit
+                              </button>
+                              {!isExpired && (
+                                <button
+                                  onClick={() => handleExpire(config.id, 'capital')}
+                                  className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                                >
+                                  Expire
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDelete(config.id, 'capital')}
+                                className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Regulatory Configuration Tab (Same as before) */}
       {activeTab === 'regulatory' && !loading && (
         <>
           {/* Regulatory Configuration Form */}
@@ -778,32 +1103,11 @@ export default function BUSINESS1() {
                 <textarea
                   value={regulatoryForm.remarks}
                   onChange={(e) => setRegulatoryForm({...regulatoryForm, remarks: e.target.value})}
-                  rows="3"
+                  rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional details about this regulatory fee..."
                 />
               </div>
-
-              {/* Fee Preview */}
-              {regulatoryForm.amount && (
-                <div className="md:col-span-2 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <h4 className="font-medium mb-2">Fee Preview</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Fee Type:</span>
-                      <div className="text-lg">{regulatoryForm.fee_name}</div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Applicable To:</span>
-                      <div className="text-lg">{regulatoryForm.business_type || 'All Businesses'}</div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Amount:</span>
-                      <div className="text-lg">₱{parseFloat(regulatoryForm.amount).toLocaleString()}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Form Actions */}
               <div className="md:col-span-2 flex gap-4 mt-4">
@@ -915,7 +1219,7 @@ export default function BUSINESS1() {
         </>
       )}
 
-      {/* Penalty Configuration Tab */}
+      {/* Penalty Configuration Tab (Same as before) */}
       {activeTab === 'penalty' && !loading && (
         <>
           {/* Penalty Configuration Form */}
@@ -966,28 +1270,11 @@ export default function BUSINESS1() {
                 <textarea
                   value={penaltyForm.remarks}
                   onChange={(e) => setPenaltyForm({...penaltyForm, remarks: e.target.value})}
-                  rows="3"
+                  rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="Additional details about this penalty (e.g., Late payment penalty, Underpayment penalty...)"
+                  placeholder="Additional details about this penalty..."
                 />
               </div>
-
-              {/* Penalty Preview */}
-              {penaltyForm.penalty_percent && (
-                <div className="md:col-span-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <h4 className="font-medium mb-2">Penalty Preview</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Penalty Rate:</span>
-                      <div className="text-lg">{penaltyForm.penalty_percent}%</div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Example (₱1,000 base):</span>
-                      <div className="text-lg">₱{(1000 * (parseFloat(penaltyForm.penalty_percent) / 100)).toFixed(2)}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Form Actions */}
               <div className="md:col-span-2 flex gap-4 mt-4">
@@ -1095,7 +1382,7 @@ export default function BUSINESS1() {
         </>
       )}
 
-      {/* Discount Configuration Tab */}
+      {/* Discount Configuration Tab (Same as before) */}
       {activeTab === 'discount' && !loading && (
         <>
           {/* Discount Configuration Form */}
@@ -1146,28 +1433,11 @@ export default function BUSINESS1() {
                 <textarea
                   value={discountForm.remarks}
                   onChange={(e) => setDiscountForm({...discountForm, remarks: e.target.value})}
-                  rows="3"
+                  rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="Additional details about this discount (e.g., Early payment discount, Senior citizen discount...)"
+                  placeholder="Additional details about this discount..."
                 />
               </div>
-
-              {/* Discount Preview */}
-              {discountForm.discount_percent && (
-                <div className="md:col-span-2 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <h4 className="font-medium mb-2">Discount Preview</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Discount Rate:</span>
-                      <div className="text-lg">{discountForm.discount_percent}%</div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Example (₱1,000 base):</span>
-                      <div className="text-lg">₱{(1000 * (parseFloat(discountForm.discount_percent) / 100)).toFixed(2)}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Form Actions */}
               <div className="md:col-span-2 flex gap-4 mt-4">
