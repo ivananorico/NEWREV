@@ -11,6 +11,7 @@ export default function RPTValidationInfo() {
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
   const [landConfigs, setLandConfigs] = useState([]);
   const [propertyConfigs, setPropertyConfigs] = useState([]);
+  const [buildingAssessmentLevels, setBuildingAssessmentLevels] = useState([]);
   const [taxConfigs, setTaxConfigs] = useState([]);
   const [buildingWarning, setBuildingWarning] = useState("");
 
@@ -67,7 +68,7 @@ export default function RPTValidationInfo() {
     material_type: "",
     building_age: 0,
     range_matched: false,
-    matched_config: null,
+    matched_assessment_level: null,
     market_value_per_sqm: 0,
     basic_tax: 0,
     sef_tax: 0,
@@ -302,6 +303,7 @@ export default function RPTValidationInfo() {
     setLoading(false);
   }
 };
+
   const fetchConfigurations = async () => {
     try {
       console.log("⚙️ Fetching configurations...");
@@ -323,7 +325,7 @@ export default function RPTValidationInfo() {
         }
       }
 
-      // Fetch property configurations
+      // Fetch property configurations (for unit_cost and depreciation_rate only)
       const propertyResponse = await fetch(`${API_BASE}/get_property_configurations.php`);
       const propertyData = await propertyResponse.json();
       console.log("🏗️ Property configs:", propertyData);
@@ -338,6 +340,15 @@ export default function RPTValidationInfo() {
             construction_type: activePropertyConfigs[0].material_type
           }));
         }
+      }
+
+      // Fetch building assessment levels (NEW TABLE - for assessment levels based on classification and depreciated value ranges)
+      const assessmentResponse = await fetch(`${API_BASE}/get_building_assessment_levels.php`);
+      const assessmentData = await assessmentResponse.json();
+      console.log("📊 Building assessment levels:", assessmentData);
+      
+      if (assessmentData.status === "success") {
+        setBuildingAssessmentLevels(assessmentData.assessment_levels || []);
       }
 
       // Fetch tax configurations
@@ -359,10 +370,27 @@ export default function RPTValidationInfo() {
     calculateLandValues();
   }, [assessmentForm.land_property_type, assessmentForm.land_area_sqm, landConfigs]);
 
-  // Calculate building values
+  // Calculate building values - NOW using building assessment levels table
   useEffect(() => {
     calculateBuildingValues();
-  }, [assessmentForm.construction_type, assessmentForm.floor_area_sqm, assessmentForm.year_built, propertyConfigs]);
+  }, [assessmentForm.construction_type, assessmentForm.floor_area_sqm, assessmentForm.year_built, 
+      propertyConfigs, buildingAssessmentLevels, assessmentForm.land_property_type]);
+
+  // Get filtered construction types based on land classification
+  const getFilteredConstructionTypes = () => {
+    if (!assessmentForm.land_property_type) return [];
+    
+    // Get all unique material types from property configs that have the same classification
+    const classificationPropertyConfigs = propertyConfigs.filter(config => 
+      config.classification === assessmentForm.land_property_type && 
+      config.status === 'active'
+    );
+    
+    // Extract unique material types
+    const uniqueMaterialTypes = [...new Set(classificationPropertyConfigs.map(config => config.material_type))];
+    
+    return uniqueMaterialTypes;
+  };
 
   const calculateLandValues = () => {
     const { land_property_type, land_area_sqm } = assessmentForm;
@@ -434,9 +462,9 @@ export default function RPTValidationInfo() {
   };
 
   const calculateBuildingValues = () => {
-    const { construction_type, floor_area_sqm, year_built } = assessmentForm;
+    const { construction_type, floor_area_sqm, year_built, land_property_type } = assessmentForm;
     
-    if (!floor_area_sqm || floor_area_sqm <= 0 || !construction_type) {
+    if (!floor_area_sqm || floor_area_sqm <= 0 || !construction_type || !land_property_type) {
       setBuildingCalculations({ 
         market_value: 0, 
         depreciated_value: 0, 
@@ -446,7 +474,7 @@ export default function RPTValidationInfo() {
         material_type: "",
         building_age: 0,
         range_matched: false,
-        matched_config: null,
+        matched_assessment_level: null,
         market_value_per_sqm: 0,
         basic_tax: 0,
         sef_tax: 0,
@@ -464,90 +492,16 @@ export default function RPTValidationInfo() {
       return;
     }
 
-    const propertyConfigsForType = propertyConfigs.filter(config => 
-      config.material_type === construction_type && config.status === 'active'
+    // Find property config for unit_cost and depreciation_rate
+    const propertyConfig = propertyConfigs.find(config => 
+      config.material_type === construction_type && 
+      config.classification === land_property_type &&
+      config.status === 'active'
     );
 
-    if (propertyConfigsForType.length > 0) {
-      const currentYear = new Date().getFullYear();
-      const buildingAge = currentYear - parseInt(year_built);
-      const market_value_per_sqm = parseFloat(propertyConfigsForType[0].unit_cost);
-      const market_value = parseFloat(floor_area_sqm) * market_value_per_sqm;
+    if (!propertyConfig) {
+      setBuildingWarning(`No configuration found for construction type: ${construction_type} in ${land_property_type} classification`);
       
-      const matchingConfig = propertyConfigsForType.find(config => 
-        market_value >= parseFloat(config.min_value) && market_value <= parseFloat(config.max_value)
-      );
-
-      if (matchingConfig) {
-        const depreciationPercent = Math.min(100, buildingAge * parseFloat(matchingConfig.depreciation_rate));
-        const depreciated_value = market_value * ((100 - depreciationPercent) / 100);
-        const assessed_value = depreciated_value * (parseFloat(matchingConfig.level_percent) / 100);
-        
-        setBuildingCalculations({
-          market_value: market_value,
-          depreciated_value: depreciated_value,
-          assessed_value: assessed_value,
-          assessment_level: parseFloat(matchingConfig.level_percent),
-          depreciation_percent: depreciationPercent,
-          material_type: matchingConfig.material_type,
-          building_age: buildingAge,
-          range_matched: true,
-          matched_config: matchingConfig,
-          market_value_per_sqm: market_value_per_sqm,
-          basic_tax: 0, // Will be calculated in calculateAnnualTaxes
-          sef_tax: 0,   // Will be calculated in calculateAnnualTaxes
-          annual_tax: 0 // Will be calculated in calculateAnnualTaxes
-        });
-
-        setAssessmentForm(prev => ({
-          ...prev,
-          building_market_value: market_value.toFixed(2),
-          building_depreciated_value: depreciated_value.toFixed(2),
-          building_assessed_value: assessed_value.toFixed(2),
-          building_assessment_level: matchingConfig.level_percent,
-          depreciation_percent: depreciationPercent.toFixed(2)
-        }));
-
-        setBuildingWarning("");
-      } else {
-        const depreciationPercent = Math.min(100, buildingAge * parseFloat(propertyConfigsForType[0].depreciation_rate));
-        const depreciated_value = market_value * ((100 - depreciationPercent) / 100);
-        
-        setBuildingCalculations({
-          market_value: market_value,
-          depreciated_value: depreciated_value,
-          assessed_value: 0,
-          assessment_level: 0,
-          depreciation_percent: depreciationPercent,
-          material_type: construction_type,
-          building_age: buildingAge,
-          range_matched: false,
-          matched_config: null,
-          market_value_per_sqm: market_value_per_sqm,
-          basic_tax: 0,
-          sef_tax: 0,
-          annual_tax: 0
-        });
-
-        setAssessmentForm(prev => ({
-          ...prev,
-          building_market_value: market_value.toFixed(2),
-          building_depreciated_value: depreciated_value.toFixed(2),
-          building_assessed_value: "",
-          building_assessment_level: "",
-          depreciation_percent: depreciationPercent.toFixed(2)
-        }));
-
-        const minRange = Math.min(...propertyConfigsForType.map(config => parseFloat(config.min_value)));
-        const maxRange = Math.max(...propertyConfigsForType.map(config => parseFloat(config.max_value)));
-        
-        setBuildingWarning(
-          `❌ Market value ${formatCurrency(market_value)} is outside configured ranges for ${construction_type} ` +
-          `(${formatCurrency(minRange)} - ${formatCurrency(maxRange)}). ` +
-          `Assessment level and assessed value cannot be calculated.`
-        );
-      }
-    } else {
       setBuildingCalculations({ 
         market_value: 0, 
         depreciated_value: 0, 
@@ -557,7 +511,7 @@ export default function RPTValidationInfo() {
         material_type: "",
         building_age: 0,
         range_matched: false,
-        matched_config: null,
+        matched_assessment_level: null,
         market_value_per_sqm: 0,
         basic_tax: 0,
         sef_tax: 0,
@@ -571,7 +525,105 @@ export default function RPTValidationInfo() {
         building_assessment_level: "",
         depreciation_percent: ""
       }));
-      setBuildingWarning(`No active configurations found for construction type: ${construction_type}`);
+      return;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const buildingAge = currentYear - parseInt(year_built);
+    const market_value_per_sqm = parseFloat(propertyConfig.unit_cost);
+    const market_value = parseFloat(floor_area_sqm) * market_value_per_sqm;
+    
+    // Calculate depreciation
+    const depreciationPercent = Math.min(100, buildingAge * parseFloat(propertyConfig.depreciation_rate));
+    const depreciated_value = market_value * ((100 - depreciationPercent) / 100);
+    
+    // NOW: Find assessment level from building_assessment_levels table based on:
+    // 1. Classification (Commercial, Residential, etc.)
+    // 2. Depreciated value falls within min_assessed_value and max_assessed_value ranges
+    const matchingAssessmentLevel = buildingAssessmentLevels.find(level => 
+      level.classification === land_property_type &&
+      depreciated_value >= parseFloat(level.min_assessed_value) && 
+      depreciated_value <= parseFloat(level.max_assessed_value) &&
+      level.status === 'active'
+    );
+
+    if (matchingAssessmentLevel) {
+      // Calculate assessed value: Depreciated Value × Assessment Level %
+      const assessed_value = depreciated_value * (parseFloat(matchingAssessmentLevel.level_percent) / 100);
+      
+      setBuildingCalculations({
+        market_value: market_value,
+        depreciated_value: depreciated_value,
+        assessed_value: assessed_value,
+        assessment_level: parseFloat(matchingAssessmentLevel.level_percent),
+        depreciation_percent: depreciationPercent,
+        material_type: construction_type,
+        building_age: buildingAge,
+        range_matched: true,
+        matched_assessment_level: matchingAssessmentLevel,
+        market_value_per_sqm: market_value_per_sqm,
+        basic_tax: 0, // Will be calculated in calculateAnnualTaxes
+        sef_tax: 0,   // Will be calculated in calculateAnnualTaxes
+        annual_tax: 0 // Will be calculated in calculateAnnualTaxes
+      });
+
+      setAssessmentForm(prev => ({
+        ...prev,
+        building_market_value: market_value.toFixed(2),
+        building_depreciated_value: depreciated_value.toFixed(2),
+        building_assessed_value: assessed_value.toFixed(2),
+        building_assessment_level: matchingAssessmentLevel.level_percent,
+        depreciation_percent: depreciationPercent.toFixed(2)
+      }));
+
+      setBuildingWarning("");
+    } else {
+      // No matching assessment level found for this depreciated value range
+      setBuildingCalculations({
+        market_value: market_value,
+        depreciated_value: depreciated_value,
+        assessed_value: 0,
+        assessment_level: 0,
+        depreciation_percent: depreciationPercent,
+        material_type: construction_type,
+        building_age: buildingAge,
+        range_matched: false,
+        matched_assessment_level: null,
+        market_value_per_sqm: market_value_per_sqm,
+        basic_tax: 0,
+        sef_tax: 0,
+        annual_tax: 0
+      });
+
+      setAssessmentForm(prev => ({
+        ...prev,
+        building_market_value: market_value.toFixed(2),
+        building_depreciated_value: depreciated_value.toFixed(2),
+        building_assessed_value: "",
+        building_assessment_level: "",
+        depreciation_percent: depreciationPercent.toFixed(2)
+      }));
+
+      // Get all assessment levels for this classification
+      const classificationLevels = buildingAssessmentLevels.filter(
+        level => level.classification === land_property_type && level.status === 'active'
+      );
+      
+      if (classificationLevels.length > 0) {
+        const minRange = Math.min(...classificationLevels.map(level => parseFloat(level.min_assessed_value)));
+        const maxRange = Math.max(...classificationLevels.map(level => parseFloat(level.max_assessed_value)));
+        
+        setBuildingWarning(
+          `❌ Depreciated value ${formatCurrency(depreciated_value)} is outside configured assessed value ranges for ${land_property_type} classification ` +
+          `(${formatCurrency(minRange)} - ${formatCurrency(maxRange)}). ` +
+          `Assessment level and assessed value cannot be calculated.`
+        );
+      } else {
+        setBuildingWarning(
+          `❌ No assessment levels configured for ${land_property_type} classification. ` +
+          `Please add assessment levels in the building_assessment_levels table.`
+        );
+      }
     }
   };
 
@@ -621,7 +673,7 @@ export default function RPTValidationInfo() {
     // Show warning if building range doesn't match
     if (buildingWarning && registration.has_building === 'yes') {
       const proceed = window.confirm(
-        "Building market value is outside configured ranges. Assessment level and assessed value cannot be calculated. Do you want to proceed with the assessment anyway?"
+        "Building depreciated value is outside configured assessed value ranges. Assessment level and assessed value cannot be calculated. Do you want to proceed with the assessment anyway?"
       );
       if (!proceed) {
         setIsSubmitting(false);
@@ -792,6 +844,28 @@ export default function RPTValidationInfo() {
       currency: 'PHP'
     }).format(amount);
   };
+
+  // Reset construction type when land property type changes
+  useEffect(() => {
+    if (assessmentForm.land_property_type) {
+      const filteredTypes = getFilteredConstructionTypes();
+      if (filteredTypes.length > 0) {
+        // If current construction type is not in filtered types, reset it
+        if (!filteredTypes.includes(assessmentForm.construction_type)) {
+          setAssessmentForm(prev => ({
+            ...prev,
+            construction_type: filteredTypes[0]
+          }));
+        }
+      } else {
+        // No construction types available for this classification
+        setAssessmentForm(prev => ({
+          ...prev,
+          construction_type: ""
+        }));
+      }
+    }
+  }, [assessmentForm.land_property_type]);
 
   if (loading) {
     return (
@@ -1123,14 +1197,18 @@ export default function RPTValidationInfo() {
                         onChange={(e) => setAssessmentForm({...assessmentForm, construction_type: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                         required
+                        disabled={!assessmentForm.land_property_type}
                       >
                         <option value="">Select Construction Type</option>
-                        {propertyConfigs.filter(config => config.status === 'active').map((config) => (
-                          <option key={config.id} value={config.material_type}>
-                            {config.material_type}
+                        {getFilteredConstructionTypes().map((materialType, index) => (
+                          <option key={index} value={materialType}>
+                            {materialType}
                           </option>
                         ))}
                       </select>
+                      {!assessmentForm.land_property_type && (
+                        <p className="text-xs text-red-500 mt-1">Select Land Property Type first</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Floor Area (sqm) *</label>
@@ -1197,7 +1275,9 @@ export default function RPTValidationInfo() {
                       <input
                         type="text"
                         value={formatCurrency(buildingCalculations.depreciated_value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                        className={`w-full px-3 py-2 border rounded-md ${
+                          buildingCalculations.range_matched ? 'border-gray-300 bg-gray-50' : 'border-yellow-300 bg-yellow-50'
+                        }`}
                         readOnly
                       />
                     </div>
@@ -1224,6 +1304,17 @@ export default function RPTValidationInfo() {
                       />
                     </div>
                   </div>
+                  
+                  {/* Assessment Level Info */}
+                  {buildingCalculations.matched_assessment_level && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-semibold">Assessment Level Applied:</span> {buildingCalculations.assessment_level}%
+                        <br />
+                        <span className="text-xs">Based on depreciated value range: {formatCurrency(buildingCalculations.matched_assessment_level.min_assessed_value)} - {formatCurrency(buildingCalculations.matched_assessment_level.max_assessed_value)}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1275,7 +1366,7 @@ export default function RPTValidationInfo() {
                 </div>
 
                 {/* Building Tax Breakdown */}
-                {registration.has_building === 'yes' && (
+                {registration.has_building === 'yes' && buildingCalculations.assessed_value > 0 && (
                   <div className="mb-4">
                     <h5 className="text-sm font-semibold text-gray-700 mb-2">Building Tax Breakdown:</h5>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

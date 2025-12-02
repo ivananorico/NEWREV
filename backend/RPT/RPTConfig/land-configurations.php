@@ -71,43 +71,40 @@ function createConfiguration() {
         return;
     }
     
-    // Validate required fields
+    // Validate required fields (without vicinity)
     if (!isset($input['classification']) || !isset($input['market_value']) || 
-        !isset($input['assessment_level']) || !isset($input['effective_date']) ||
-        !isset($input['vicinity'])) {
+        !isset($input['assessment_level']) || !isset($input['effective_date'])) {
         http_response_code(400);
         echo json_encode(["error" => "Missing required fields"]);
         return;
     }
     
-    // Check for overlapping active configurations with same classification AND vicinity
+    // Check for overlapping active configurations with same classification
     try {
         $checkStmt = $pdo->prepare("
             SELECT id FROM land_configurations 
             WHERE classification = ? 
-            AND vicinity = ?
             AND status = 'active'
             AND effective_date <= ? 
             AND (expiration_date IS NULL OR expiration_date >= ?)
         ");
         $checkStmt->execute([
             $input['classification'],
-            $input['vicinity'],
             $input['effective_date'],
             $input['effective_date']
         ]);
         
         if ($checkStmt->rowCount() > 0) {
             http_response_code(400);
-            echo json_encode(["error" => "Active configuration already exists for this classification and vicinity on the selected date"]);
+            echo json_encode(["error" => "Active configuration already exists for this classification on the selected date"]);
             return;
         }
         
         $stmt = $pdo->prepare("
             INSERT INTO land_configurations (
                 classification, market_value, assessment_level, description,
-                effective_date, expiration_date, status, vicinity
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                effective_date, expiration_date, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
         $stmt->execute([
@@ -117,8 +114,7 @@ function createConfiguration() {
             $input['description'] ?? null,
             $input['effective_date'],
             !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            $input['status'] ?? 'active',
-            $input['vicinity'] ?? 'General Area'
+            $input['status'] ?? 'active'
         ]);
         
         echo json_encode([
@@ -149,12 +145,11 @@ function updateConfiguration() {
         return;
     }
     
-    // Check for overlapping active configurations with same classification AND vicinity (excluding current record)
+    // Check for overlapping active configurations with same classification (excluding current record)
     try {
         $checkStmt = $pdo->prepare("
             SELECT id FROM land_configurations 
             WHERE classification = ? 
-            AND vicinity = ?
             AND status = 'active'
             AND effective_date <= ? 
             AND (expiration_date IS NULL OR expiration_date >= ?)
@@ -162,7 +157,6 @@ function updateConfiguration() {
         ");
         $checkStmt->execute([
             $input['classification'],
-            $input['vicinity'],
             $input['effective_date'],
             $input['effective_date'],
             $id
@@ -170,14 +164,14 @@ function updateConfiguration() {
         
         if ($checkStmt->rowCount() > 0) {
             http_response_code(400);
-            echo json_encode(["error" => "Active configuration already exists for this classification and vicinity on the selected date"]);
+            echo json_encode(["error" => "Active configuration already exists for this classification on the selected date"]);
             return;
         }
         
         $stmt = $pdo->prepare("
             UPDATE land_configurations SET 
                 classification = ?, market_value = ?, assessment_level = ?, description = ?,
-                effective_date = ?, expiration_date = ?, status = ?, vicinity = ?
+                effective_date = ?, expiration_date = ?, status = ?, updated_at = NOW()
             WHERE id = ?
         ");
         
@@ -189,7 +183,6 @@ function updateConfiguration() {
             $input['effective_date'],
             !empty($input['expiration_date']) ? $input['expiration_date'] : null,
             $input['status'] ?? 'active',
-            $input['vicinity'] ?? 'General Area',
             $id
         ]);
         
@@ -223,17 +216,20 @@ function patchConfiguration() {
         return;
     }
     
-    // Build dynamic update query
+    // Build dynamic update query (without vicinity)
     $fields = [];
     $values = [];
     
-    $allowedFields = ['status', 'expiration_date', 'market_value', 'assessment_level', 'description', 'vicinity'];
+    $allowedFields = ['status', 'expiration_date', 'market_value', 'assessment_level', 'description'];
     foreach ($allowedFields as $field) {
         if (isset($input[$field])) {
             $fields[] = "$field = ?";
             $values[] = $input[$field];
         }
     }
+    
+    // Always update the updated_at timestamp
+    $fields[] = "updated_at = NOW()";
     
     if (empty($fields)) {
         http_response_code(400);

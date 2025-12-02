@@ -4,6 +4,7 @@ export default function RPTConfig() {
   const [activeTab, setActiveTab] = useState('land');
   const [landConfigurations, setLandConfigurations] = useState([]);
   const [propertyConfigurations, setPropertyConfigurations] = useState([]);
+  const [buildingAssessmentLevels, setBuildingAssessmentLevels] = useState([]);
   const [taxConfigurations, setTaxConfigurations] = useState([]);
   const [discountConfigurations, setDiscountConfigurations] = useState([]);
   const [penaltyConfigurations, setPenaltyConfigurations] = useState([]);
@@ -22,7 +23,7 @@ export default function RPTConfig() {
     status: 'active'
   });
 
-  // Property Configuration Form
+  // Property Configuration Form (without assessment level)
   const [propertyFormData, setPropertyFormData] = useState({
     classification: '',
     material_type: '',
@@ -30,6 +31,16 @@ export default function RPTConfig() {
     depreciation_rate: '',
     min_value: '',
     max_value: '',
+    effective_date: '',
+    expiration_date: '',
+    status: 'active'
+  });
+
+  // Building Assessment Level Form
+  const [buildingAssessmentFormData, setBuildingAssessmentFormData] = useState({
+    classification: '',
+    min_assessed_value: '',
+    max_assessed_value: '',
     level_percent: '',
     effective_date: '',
     expiration_date: '',
@@ -66,7 +77,7 @@ export default function RPTConfig() {
 
   const API_BASE = "http://localhost/revenue/backend/RPT/RPTConfig";
 
-  // Fetch all data with hyphenated endpoints
+  // Fetch all data
   const fetchLandConfigurations = async () => {
     try {
       setLoading(true);
@@ -92,6 +103,21 @@ export default function RPTConfig() {
     } catch (error) {
       console.error('Error fetching property configurations:', error);
       setError('Failed to load property configurations: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBuildingAssessmentLevels = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/building-assessment-levels.php?current_date=${currentDate}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setBuildingAssessmentLevels(data);
+    } catch (error) {
+      console.error('Error fetching building assessment levels:', error);
+      setError('Failed to load building assessment levels: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -145,12 +171,13 @@ export default function RPTConfig() {
   useEffect(() => {
     fetchLandConfigurations();
     fetchPropertyConfigurations();
+    fetchBuildingAssessmentLevels();
     fetchTaxConfigurations();
     fetchDiscountConfigurations();
     fetchPenaltyConfigurations();
   }, [currentDate]);
 
-  // Form Handlers with hyphenated endpoints
+  // Form Handlers
   const handleLandSubmit = async (e) => {
     e.preventDefault();
     const url = editingId ? `${API_BASE}/land-configurations.php?id=${editingId}` : `${API_BASE}/land-configurations.php`;
@@ -201,10 +228,34 @@ export default function RPTConfig() {
     }
   };
 
+  const handleBuildingAssessmentSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingId ? `${API_BASE}/building-assessment-levels.php?id=${editingId}` : `${API_BASE}/building-assessment-levels.php`;
+    const method = editingId ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildingAssessmentFormData)
+      });
+      const result = await response.json();
+      if (response.ok) {
+        fetchBuildingAssessmentLevels();
+        resetBuildingAssessmentForm();
+        alert(editingId ? 'Building assessment level updated!' : 'Building assessment level created!');
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error saving building assessment level:', error);
+      alert('Error saving building assessment level');
+    }
+  };
+
   const handleTaxSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate tax name to only allow Basic Tax or SEF Tax
     if (!['Basic Tax', 'SEF Tax'].includes(taxFormData.tax_name)) {
       alert('Tax name must be either "Basic Tax" or "SEF Tax"');
       return;
@@ -306,13 +357,26 @@ export default function RPTConfig() {
       depreciation_rate: config.depreciation_rate,
       min_value: config.min_value,
       max_value: config.max_value,
-      level_percent: config.level_percent,
       effective_date: config.effective_date,
       expiration_date: config.expiration_date || '',
       status: config.status
     });
     setEditingId(config.id);
     setEditingType('property');
+  };
+
+  const handleBuildingAssessmentEdit = (config) => {
+    setBuildingAssessmentFormData({
+      classification: config.classification,
+      min_assessed_value: config.min_assessed_value,
+      max_assessed_value: config.max_assessed_value,
+      level_percent: config.level_percent,
+      effective_date: config.effective_date,
+      expiration_date: config.expiration_date || '',
+      status: config.status
+    });
+    setEditingId(config.id);
+    setEditingType('building-assessment');
   };
 
   const handleTaxEdit = (config) => {
@@ -349,15 +413,16 @@ export default function RPTConfig() {
     setEditingType('penalty');
   };
 
-  // Common Handlers with hyphenated endpoints
+  // Delete and Expire Handlers
   const handleDelete = async (id, type) => {
-    const typeName = type.replace('-configurations', '').replace('-', ' ');
+    const typeName = type.replace('-configurations', '').replace('-', ' ').replace('-levels', ' levels');
     if (window.confirm(`Are you sure you want to delete this ${typeName} configuration?`)) {
       try {
         const response = await fetch(`${API_BASE}/${type}.php?id=${id}`, { method: 'DELETE' });
         if (response.ok) {
           if (type === 'land-configurations') fetchLandConfigurations();
           else if (type === 'property-configurations') fetchPropertyConfigurations();
+          else if (type === 'building-assessment-levels') fetchBuildingAssessmentLevels();
           else if (type === 'tax-configurations') fetchTaxConfigurations();
           else if (type === 'discount-configurations') fetchDiscountConfigurations();
           else if (type === 'penalty-configurations') fetchPenaltyConfigurations();
@@ -371,7 +436,7 @@ export default function RPTConfig() {
   };
 
   const handleExpire = async (id, type) => {
-    const typeName = type.replace('-configurations', '').replace('-', ' ');
+    const typeName = type.replace('-configurations', '').replace('-', ' ').replace('-levels', ' levels');
     if (window.confirm(`Are you sure you want to expire this ${typeName}?`)) {
       try {
         const response = await fetch(`${API_BASE}/${type}.php?id=${id}`, {
@@ -385,6 +450,7 @@ export default function RPTConfig() {
         if (response.ok) {
           if (type === 'land-configurations') fetchLandConfigurations();
           else if (type === 'property-configurations') fetchPropertyConfigurations();
+          else if (type === 'building-assessment-levels') fetchBuildingAssessmentLevels();
           else if (type === 'tax-configurations') fetchTaxConfigurations();
           else if (type === 'discount-configurations') fetchDiscountConfigurations();
           else if (type === 'penalty-configurations') fetchPenaltyConfigurations();
@@ -420,6 +486,19 @@ export default function RPTConfig() {
       depreciation_rate: '',
       min_value: '',
       max_value: '',
+      effective_date: '',
+      expiration_date: '',
+      status: 'active'
+    });
+    setEditingId(null);
+    setEditingType(null);
+  };
+
+  const resetBuildingAssessmentForm = () => {
+    setBuildingAssessmentFormData({
+      classification: '',
+      min_assessed_value: '',
+      max_assessed_value: '',
       level_percent: '',
       effective_date: '',
       expiration_date: '',
@@ -466,6 +545,7 @@ export default function RPTConfig() {
   // Statistics
   const activeLandConfigs = landConfigurations.filter(config => config.status === 'active').length;
   const activePropertyConfigs = propertyConfigurations.filter(config => config.status === 'active').length;
+  const activeBuildingAssessmentConfigs = buildingAssessmentLevels.filter(config => config.status === 'active').length;
   const activeTaxConfigs = taxConfigurations.filter(config => config.status === 'active').length;
   const activeDiscountConfigs = discountConfigurations.filter(config => config.status === 'active').length;
   const activePenaltyConfigs = penaltyConfigurations.filter(config => config.status === 'active').length;
@@ -488,10 +568,10 @@ export default function RPTConfig() {
         </div>
       )}
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation - Added building-assessment tab */}
       <div className="mb-6 border-b border-gray-200 dark:border-slate-700">
         <nav className="-mb-px flex space-x-8">
-          {['land', 'property', 'tax', 'discount-penalty'].map(tab => (
+          {['land', 'property', 'building-assessment', 'tax', 'discount-penalty'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -501,7 +581,9 @@ export default function RPTConfig() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
               }`}
             >
-              {tab === 'discount-penalty' ? 'Discount & Penalty' : tab.charAt(0).toUpperCase() + tab.slice(1)} Configurations
+              {tab === 'discount-penalty' ? 'Discount & Penalty' : 
+               tab === 'building-assessment' ? 'Building Assessment' :
+               tab.charAt(0).toUpperCase() + tab.slice(1)} Configurations
             </button>
           ))}
         </nav>
@@ -521,7 +603,7 @@ export default function RPTConfig() {
         </p>
       </div>
 
-      {/* Statistics */}
+      {/* Statistics - Added building assessment stats */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-blue-800 dark:text-blue-300">Land Configs</h3>
@@ -533,24 +615,24 @@ export default function RPTConfig() {
           <p className="text-2xl font-bold">{propertyConfigurations.length}</p>
           <p className="text-sm">Active: {activePropertyConfigs}</p>
         </div>
+        <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-lg">
+          <h3 className="font-semibold text-teal-800 dark:text-teal-300">Building Assessment</h3>
+          <p className="text-2xl font-bold">{buildingAssessmentLevels.length}</p>
+          <p className="text-sm">Active: {activeBuildingAssessmentConfigs}</p>
+        </div>
         <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-purple-800 dark:text-purple-300">Tax Configs</h3>
           <p className="text-2xl font-bold">{taxConfigurations.length}</p>
           <p className="text-sm">Active: {activeTaxConfigs}</p>
         </div>
-        <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-lg">
-          <h3 className="font-semibold text-teal-800 dark:text-teal-300">Discount Configs</h3>
-          <p className="text-2xl font-bold">{discountConfigurations.length}</p>
-          <p className="text-sm">Active: {activeDiscountConfigs}</p>
-        </div>
         <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
-          <h3 className="font-semibold text-orange-800 dark:text-orange-300">Penalty Configs</h3>
-          <p className="text-2xl font-bold">{penaltyConfigurations.length}</p>
-          <p className="text-sm">Active: {activePenaltyConfigs}</p>
+          <h3 className="font-semibold text-orange-800 dark:text-orange-300">Discount/Penalty</h3>
+          <p className="text-2xl font-bold">{discountConfigurations.length + penaltyConfigurations.length}</p>
+          <p className="text-sm">Active: {activeDiscountConfigs + activePenaltyConfigs}</p>
         </div>
         <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
-          <h3 className="font-semibold text-indigo-800 dark:text-indigo-300">Active Total</h3>
-          <p className="text-2xl font-bold">{activeLandConfigs + activePropertyConfigs + activeTaxConfigs + activeDiscountConfigs + activePenaltyConfigs}</p>
+          <h3 className="font-semibold text-indigo-800 dark:text-indigo-300">Total Active</h3>
+          <p className="text-2xl font-bold">{activeLandConfigs + activePropertyConfigs + activeBuildingAssessmentConfigs + activeTaxConfigs + activeDiscountConfigs + activePenaltyConfigs}</p>
         </div>
       </div>
 
@@ -717,7 +799,7 @@ export default function RPTConfig() {
         </>
       )}
 
-      {/* Property Configuration Tab */}
+      {/* Property Configuration Tab (without assessment level) */}
       {activeTab === 'property' && !loading && (
         <>
           <div className="mb-8">
@@ -801,20 +883,6 @@ export default function RPTConfig() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Assessment Level (%) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={propertyFormData.level_percent}
-                  onChange={(e) => setPropertyFormData({...propertyFormData, level_percent: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium mb-2">Status</label>
                 <select
                   value={propertyFormData.status}
@@ -869,7 +937,6 @@ export default function RPTConfig() {
                       <th className="border p-2 text-left">Unit Cost</th>
                       <th className="border p-2 text-left">Depreciation</th>
                       <th className="border p-2 text-left">Value Range</th>
-                      <th className="border p-2 text-left">Assessment Level</th>
                       <th className="border p-2 text-left">Effective Date</th>
                       <th className="border p-2 text-left">Status</th>
                       <th className="border p-2 text-left">Actions</th>
@@ -883,7 +950,6 @@ export default function RPTConfig() {
                         <td className="border p-2">₱{parseFloat(config.unit_cost).toLocaleString()}</td>
                         <td className="border p-2">{config.depreciation_rate}%</td>
                         <td className="border p-2">₱{parseFloat(config.min_value).toLocaleString()} - ₱{parseFloat(config.max_value).toLocaleString()}</td>
-                        <td className="border p-2">{config.level_percent}%</td>
                         <td className="border p-2">{config.effective_date}</td>
                         <td className="border p-2">
                           <span className={`px-2 py-1 rounded-full text-xs ${config.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
@@ -901,6 +967,174 @@ export default function RPTConfig() {
                               </button>
                             )}
                             <button onClick={() => handleDelete(config.id, 'property-configurations')} className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors">
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Building Assessment Level Tab */}
+      {activeTab === 'building-assessment' && !loading && (
+        <>
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">
+              {editingType === 'building-assessment' ? 'Edit Building Assessment Level' : 'Add New Building Assessment Level'}
+            </h2>
+            <form onSubmit={handleBuildingAssessmentSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Classification *</label>
+                <select
+                  value={buildingAssessmentFormData.classification}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, classification: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  required
+                >
+                  <option value="">Select Classification</option>
+                  <option value="Commercial">Commercial</option>
+                  <option value="Residential">Residential</option>
+                  <option value="Industrial">Industrial</option>
+                  <option value="Agricultural">Agricultural</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Minimum Assessed Value *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={buildingAssessmentFormData.min_assessed_value}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, min_assessed_value: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Maximum Assessed Value *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={buildingAssessmentFormData.max_assessed_value}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, max_assessed_value: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Assessment Level (%) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={buildingAssessmentFormData.level_percent}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, level_percent: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select
+                  value={buildingAssessmentFormData.status}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, status: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                >
+                  <option value="active">Active</option>
+                  <option value="expired">Expired</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Effective Date *</label>
+                <input
+                  type="date"
+                  value={buildingAssessmentFormData.effective_date}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, effective_date: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Expiration Date</label>
+                <input
+                  type="date"
+                  value={buildingAssessmentFormData.expiration_date}
+                  onChange={(e) => setBuildingAssessmentFormData({...buildingAssessmentFormData, expiration_date: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                />
+              </div>
+              <div className="md:col-span-2 flex gap-4 mt-4">
+                <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors">
+                  {editingType === 'building-assessment' ? 'Update Building Assessment Level' : 'Create Building Assessment Level'}
+                </button>
+                <button type="button" onClick={resetBuildingAssessmentForm} className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Building Assessment Levels ({buildingAssessmentLevels.length})</h2>
+            {buildingAssessmentLevels.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No building assessment levels found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300 dark:border-slate-700">
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-slate-800">
+                      <th className="border p-2 text-left">Classification</th>
+                      <th className="border p-2 text-left">Value Range</th>
+                      <th className="border p-2 text-left">Assessment Level</th>
+                      <th className="border p-2 text-left">Effective Date</th>
+                      <th className="border p-2 text-left">Status</th>
+                      <th className="border p-2 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buildingAssessmentLevels.map((config) => (
+                      <tr key={config.id} className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${config.status === 'expired' ? 'bg-gray-50 dark:bg-slate-800/50 text-gray-500' : ''}`}>
+                        <td className="border p-2">
+                          <span className={`font-medium ${
+                            config.classification === 'Commercial' ? 'text-blue-600' :
+                            config.classification === 'Residential' ? 'text-green-600' :
+                            config.classification === 'Industrial' ? 'text-orange-600' : 'text-purple-600'
+                          }`}>
+                            {config.classification}
+                          </span>
+                        </td>
+                        <td className="border p-2">
+                          ₱{parseFloat(config.min_assessed_value).toLocaleString()} - ₱{parseFloat(config.max_assessed_value).toLocaleString()}
+                        </td>
+                        <td className="border p-2">{config.level_percent}%</td>
+                        <td className="border p-2">{config.effective_date}</td>
+                        <td className="border p-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${config.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+                            {config.status}
+                          </span>
+                        </td>
+                        <td className="border p-2">
+                          <div className="flex gap-2">
+                            <button onClick={() => handleBuildingAssessmentEdit(config)} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors" disabled={config.status === 'expired'}>
+                              Edit
+                            </button>
+                            {config.status === 'active' && (
+                              <button onClick={() => handleExpire(config.id, 'building-assessment-levels')} className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors">
+                                Expire
+                              </button>
+                            )}
+                            <button onClick={() => handleDelete(config.id, 'building-assessment-levels')} className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors">
                               Delete
                             </button>
                           </div>

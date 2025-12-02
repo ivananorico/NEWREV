@@ -1,9 +1,6 @@
 <?php
 // revenue/citizen_dashboard/navbar.php
 
-// Remove session_start() since it's already called in the parent file
-// Just check if session exists and get user info
-
 // Check if session is not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -11,38 +8,108 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Only redirect if user_id is not set
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../index.php');
+    header('Location: ../../index.php');
     exit();
 }
 
 $user_name = $_SESSION['user_name'] ?? 'Citizen';
 $user_email = $_SESSION['user_email'] ?? '';
 
-// Function to get the correct base path
-function getBasePath() {
-    // Get current URL path
-    $current_path = $_SERVER['PHP_SELF'];
+// DEBUG: Let's see what's happening
+$current_url = $_SERVER['REQUEST_URI'];
+$script_path = $_SERVER['SCRIPT_FILENAME'];
+$document_root = $_SERVER['DOCUMENT_ROOT'];
+
+// Calculate the correct image path
+// Image is at: revenue/citizen_dashboard/images/GSM_logo.png
+// Navbar is at: revenue/citizen_dashboard/navbar.php
+
+// Get the directory of the current page
+$current_page = $_SERVER['SCRIPT_NAME']; // e.g., /revenue/citizen_dashboard/business/business_services.php
+$current_dir = dirname($current_page); // e.g., /revenue/citizen_dashboard/business
+
+// Image is in: /revenue/citizen_dashboard/images/GSM_logo.png
+$image_dir = '/revenue/citizen_dashboard/images/GSM_logo.png';
+
+// Calculate relative path from current directory to image
+function calculateRelativePath($from, $to) {
+    $from = explode('/', trim($from, '/'));
+    $to = explode('/', trim($to, '/'));
     
-    // Check which directory we're in
-    if (strpos($current_path, 'rpt/rpt_registration') !== false || 
-        strpos($current_path, 'rpt/rpt_application') !== false) {
-        // If in rpt/rpt_registration/ or rpt/rpt_application/, go up 2 levels
-        return '../../';
-    } elseif (strpos($current_path, 'rpt') !== false) {
-        // If in rpt/, go up 1 level
-        return '../';
-    } else {
-        // If in citizen_dashboard/ directly
-        return './';
+    // Find common path
+    $commonLength = 0;
+    $minLength = min(count($from), count($to));
+    for ($i = 0; $i < $minLength; $i++) {
+        if ($from[$i] !== $to[$i]) {
+            break;
+        }
+        $commonLength++;
     }
+    
+    // Go up from current location
+    $upLevels = count($from) - $commonLength;
+    $relativePath = str_repeat('../', $upLevels);
+    
+    // Go down to image
+    for ($i = $commonLength; $i < count($to); $i++) {
+        $relativePath .= $to[$i] . '/';
+    }
+    
+    return rtrim($relativePath, '/');
 }
 
-$base_path = getBasePath();
+// Calculate paths
+$logout_path = '';
+$dashboard_path = '';
+$settings_path = '';
+$logo_path = '';
 
-// Set all paths
-$logout_path = $base_path . 'logout.php';
-$dashboard_path = $base_path . 'citizen_dashboard.php';
-$settings_path = $base_path . 'settings.php';
+if (strpos($current_url, '/revenue/citizen_dashboard/') !== false) {
+    // We're in citizen_dashboard or its subdirectories
+    $relative_path = substr($current_url, strpos($current_url, '/revenue/citizen_dashboard/') + 26);
+    $dirs = explode('/', dirname($relative_path));
+    $dirs = array_filter($dirs);
+    $depth = count($dirs);
+    
+    if ($depth == 0) {
+        // In citizen_dashboard root
+        $logout_path = './logout.php';
+        $dashboard_path = './citizen_dashboard.php';
+        $settings_path = './settings.php';
+        $logo_path = './images/GSM_logo.png'; // Same directory level
+    } else {
+        // In subdirectory
+        $logout_path = str_repeat('../', $depth) . 'logout.php';
+        $dashboard_path = str_repeat('../', $depth) . 'citizen_dashboard.php';
+        $settings_path = str_repeat('../', $depth) . 'settings.php';
+        $logo_path = str_repeat('../', $depth) . 'images/GSM_logo.png';
+    }
+} else {
+    // Fallback
+    $logout_path = 'logout.php';
+    $dashboard_path = 'citizen_dashboard.php';
+    $settings_path = 'settings.php';
+    $logo_path = './images/GSM_logo.png';
+}
+
+// ALTERNATIVE: Use absolute URL
+$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+$host = $_SERVER['HTTP_HOST'];
+$absolute_logo_path = $protocol . '://' . $host . '/revenue/citizen_dashboard/images/GSM_logo.png';
+
+// Debug output - UNCOMMENT THIS TO SEE WHAT'S WRONG
+echo "<!-- DEBUG INFO START -->";
+echo "<!-- Current URL: " . htmlspecialchars($current_url) . " -->";
+echo "<!-- Script Path: " . htmlspecialchars($script_path) . " -->";
+echo "<!-- Current Dir: " . htmlspecialchars($current_dir) . " -->";
+echo "<!-- Calculated Logo Path: " . htmlspecialchars($logo_path) . " -->";
+echo "<!-- Absolute Logo Path: " . htmlspecialchars($absolute_logo_path) . " -->";
+echo "<!-- Depth: " . (isset($depth) ? $depth : 'N/A') . " -->";
+echo "<!-- DEBUG INFO END -->";
+
+// Try using absolute path
+$logo_path = $absolute_logo_path;
+
 ?>
 <style>
 :root {
@@ -121,6 +188,12 @@ $settings_path = $base_path . 'settings.php';
     background-color: #e5e7eb;
     margin: 0.25rem 0.5rem;
 }
+
+.logo-img {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+}
 </style>
 
 <!-- Navigation Bar -->
@@ -130,10 +203,13 @@ $settings_path = $base_path . 'settings.php';
 
             <!-- Logo and Brand -->
             <div class="flex items-center space-x-3">
-                <a href="<?php echo $dashboard_path; ?>" class="flex items-center space-x-3 no-underline">
-                    <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: #4A90E2;">
-                        <i class="fas fa-user-tie text-white text-sm"></i>
-                    </div>
+                <a href="<?php echo htmlspecialchars($dashboard_path); ?>" class="flex items-center space-x-3 no-underline">
+                    <!-- Logo Image - Using absolute path -->
+                    <img src="<?php echo htmlspecialchars($logo_path); ?>" 
+                         alt="GoServePH Logo" 
+                         class="logo-img"
+                         onerror="console.error('Failed to load image:', this.src);">
+                    
                     <div>
                         <h1 class="text-xl font-bold" style="word-spacing: -0.2em;">
                             <span style="color: #4A90E2;">Go</span><!--
@@ -164,11 +240,11 @@ $settings_path = $base_path . 'settings.php';
 
                     <!-- Dropdown Menu -->
                     <div class="dropdown-menu">
-                        <a href="<?php echo $settings_path; ?>" class="dropdown-link settings">
+                        <a href="<?php echo htmlspecialchars($settings_path); ?>" class="dropdown-link settings">
                             <i class="fas fa-user-cog mr-2"></i>Profile & Settings
                         </a>
                         <div class="divider"></div>
-                        <a href="<?php echo $logout_path; ?>" class="dropdown-link logout">
+                        <a href="<?php echo htmlspecialchars($logout_path); ?>" class="dropdown-link logout">
                             <i class="fas fa-sign-out-alt mr-2"></i>Logout
                         </a>
                     </div>
