@@ -19,8 +19,8 @@ import RPT4s from './pages/RPT/RPT4s/RPT4s'
 
 // BUSINESS Pages
 import BusinessTaxConfig from './pages/BUSINESS/BusinessTaxConfig/BusinessTaxConfig'
-import BUSINESS2 from './pages/BUSINESS/BUSINESS2/BUSINESS2'
-
+import BusinessValidation from './pages/BUSINESS/BusinessValidation/BusinessValidation'
+import BusinessValidationInfo from './pages/BUSINESS/BusinessValidation/BusinessValidationInfo'
 // DIGIPAY Pages
 import DIGIPAY1 from './pages/DIGIPAY/DIGIPAY1/DIGIPAY1'
 import DIGIPAY2 from './pages/DIGIPAY/DIGIPAY2/DIGIPAY2'
@@ -77,7 +77,8 @@ function App() {
 
               {/* BUSINESS */}
               <Route path="/business/businesstaxconfig" element={<BusinessTaxConfig />} />
-              <Route path="/business/business2" element={<BUSINESS2 />} />
+              <Route path="/business/businessvalidation" element={<BusinessValidation />} />
+              <Route path="/business/businessvalidationinfo/:id" element={<BusinessValidationInfo />} />
 
               {/* TREASURY */}
               <Route path="/treasury/treasury1" element={<TREASURY1 />} />

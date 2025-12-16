@@ -24,7 +24,7 @@ const sidebarItems = [
     icon: LayoutDashboard,
     subItems: [
       { id: "business1", label: "Business Tax Configuration", path: "/BUSINESS/BusinessTaxConfig" },
-      { id: "business2", label: "BUSINESS2", path: "/BUSINESS/BUSINESS2" },
+      { id: "BusinessValidation", label: "BusinessValidation", path: "/BUSINESS/BusinessValidation" },
     ]
   },
   {
