@@ -11,22 +11,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Include your PDO DB connection
-require_once '../../db/Business/business_db.php'; // adjust path if needed
+require_once '../../db/Business/business_db.php';
 
 // Handle POST request
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    saveBusinessPermit();
+    calculateAndSaveBusinessTax();
 } else {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit();
 }
 
-// ==================== SAVE BUSINESS PERMIT ====================
-function saveBusinessPermit() {
+// ==================== CALCULATE AND SAVE BUSINESS TAX ====================
+function calculateAndSaveBusinessTax() {
     global $pdo;
     
-    // Get POST data
+    // Get POST data from Business Permit module
     $input = json_decode(file_get_contents('php://input'), true);
     
     if (!$input) {
@@ -35,8 +35,8 @@ function saveBusinessPermit() {
         exit();
     }
 
-    // Validate required fields
-    $required_fields = ['business_permit_id', 'business_name', 'owner_name', 'business_type', 'capital_investment'];
+    // Validate required fields from Business Permit
+    $required_fields = ['business_permit_id', 'business_name', 'owner_name', 'business_type', 'taxable_amount', 'tax_calculation_type'];
     $missing_fields = [];
     
     foreach ($required_fields as $field) {
@@ -49,7 +49,7 @@ function saveBusinessPermit() {
         http_response_code(400);
         echo json_encode([
             'success' => false, 
-            'message' => 'Missing required fields: ' . implode(', ', $missing_fields)
+            'message' => 'Missing required fields from Business Permit: ' . implode(', ', $missing_fields)
         ]);
         exit();
     }
@@ -57,202 +57,284 @@ function saveBusinessPermit() {
     try {
         $pdo->beginTransaction();
         
-        // Generate business permit ID if not provided
-        if (empty($input['business_permit_id']) || $input['business_permit_id'] === 'auto') {
-            $input['business_permit_id'] = generateBusinessPermitId($pdo);
-        }
+        $business_permit_id = $input['business_permit_id'];
+        $tax_calculation_type = $input['tax_calculation_type']; // 'capital_investment' or 'gross_sales'
+        $taxable_amount = floatval($input['taxable_amount']);
         
-        // Prepare SQL with correct field names matching your database schema
-        $sql = "INSERT INTO business_permits (
-            business_permit_id, 
-            business_name, 
-            owner_name, 
-            business_type,
-            capital_investment, 
-            gross_sales, 
-            address, 
-            contact_number, 
-            phone,
-            issue_date, 
-            expiry_date, 
-            is_renewal, 
-            previous_permit_id, 
-            status,
-            created_at
-        ) VALUES (
-            :business_permit_id, 
-            :business_name, 
-            :owner_name, 
-            :business_type,
-            :capital_investment, 
-            :gross_sales, 
-            :address, 
-            :contact_number, 
-            :phone,
-            :issue_date, 
-            :expiry_date, 
-            :is_renewal, 
-            :previous_permit_id, 
-            :status,
-            NOW()
-        )";
-
-        $stmt = $pdo->prepare($sql);
+        // First, check if tax calculation already exists for this permit
+        $checkSql = "SELECT id FROM business_permits WHERE business_permit_id = :business_permit_id";
+        $checkStmt = $pdo->prepare($checkSql);
+        $checkStmt->execute([':business_permit_id' => $business_permit_id]);
+        $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
         
-        // Set default values and sanitize data
-        $params = [
-            ':business_permit_id' => htmlspecialchars($input['business_permit_id']),
-            ':business_name' => htmlspecialchars($input['business_name']),
-            ':owner_name' => htmlspecialchars($input['owner_name']),
-            ':business_type' => htmlspecialchars($input['business_type']),
-            ':capital_investment' => floatval($input['capital_investment']),
-            ':gross_sales' => isset($input['gross_sales']) ? floatval($input['gross_sales']) : 0.00,
-            ':address' => isset($input['address']) ? htmlspecialchars($input['address']) : '',
-            ':contact_number' => isset($input['contact_number']) ? htmlspecialchars($input['contact_number']) : '',
-            ':phone' => isset($input['phone']) ? htmlspecialchars($input['phone']) : (isset($input['contact_number']) ? htmlspecialchars($input['contact_number']) : ''),
-            ':issue_date' => isset($input['issue_date']) ? $input['issue_date'] : date('Y-m-d'),
-            ':expiry_date' => isset($input['expiry_date']) ? $input['expiry_date'] : date('Y-m-d', strtotime('+1 year')),
-            ':is_renewal' => isset($input['is_renewal']) ? intval($input['is_renewal']) : 0,
-            ':previous_permit_id' => isset($input['previous_permit_id']) ? htmlspecialchars($input['previous_permit_id']) : null,
-            ':status' => isset($input['status']) ? $input['status'] : 'Pending' // Default to Pending for validation
-        ];
-
-        // Execute the query
-        if ($stmt->execute($params)) {
-            $permitId = $pdo->lastInsertId();
-            
-            // Automatically calculate tax assessment
-            $assessmentId = calculateTaxAssessment($pdo, $input);
-            
-            $pdo->commit();
-            
-            echo json_encode([
-                'success' => true,
-                'message' => 'Business permit saved successfully',
-                'permit_id' => $input['business_permit_id'],
-                'record_id' => $permitId,
-                'assessment_id' => $assessmentId
-            ]);
-            
+        if ($existingRecord) {
+            // Update existing record
+            $result = updateBusinessTax($pdo, $business_permit_id, $input);
         } else {
-            throw new Exception("Failed to insert permit");
+            // Create new record
+            $result = createBusinessTax($pdo, $input);
         }
+        
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Business tax calculated and saved successfully',
+            'business_permit_id' => $business_permit_id,
+            'tax_calculation' => $result
+        ]);
         
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if (isset($pdo) && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         http_response_code(500);
         
         // Log the error
-        error_log("Business Permit Save Error: " . $e->getMessage());
+        error_log("Business Tax Calculation Error: " . $e->getMessage());
         
         echo json_encode([
             'success' => false,
-            'message' => 'Failed to save business permit: ' . $e->getMessage(),
-            'error_details' => $stmt ? $stmt->errorInfo() : []
+            'message' => 'Failed to calculate business tax: ' . $e->getMessage()
         ]);
     }
 }
 
-// ==================== GENERATE BUSINESS PERMIT ID ====================
-function generateBusinessPermitId($pdo) {
-    $currentYear = date('Y');
+// ==================== CREATE NEW BUSINESS TAX RECORD ====================
+function createBusinessTax($pdo, $input) {
+    $business_permit_id = $input['business_permit_id'];
+    $tax_calculation_type = $input['tax_calculation_type'];
+    $taxable_amount = floatval($input['taxable_amount']);
+    $business_type = $input['business_type'];
     
-    // Get the latest permit ID for current year
-    $sql = "SELECT business_permit_id FROM business_permits 
-            WHERE business_permit_id LIKE 'BP-{$currentYear}-%'
-            ORDER BY business_permit_id DESC LIMIT 1";
+    // Calculate taxes
+    $taxResult = calculateTaxes($business_type, $taxable_amount, $tax_calculation_type);
     
-    $stmt = $pdo->query($sql);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Insert into business_permits table (for tax calculation)
+    $sql = "INSERT INTO business_permits (
+        business_permit_id, 
+        business_name, 
+        owner_name, 
+        business_type,
+        tax_calculation_type,
+        taxable_amount, 
+        tax_rate, 
+        tax_amount, 
+        regulatory_fees, 
+        total_tax,
+        tax_calculated,
+        tax_approved,
+        address, 
+        contact_number, 
+        phone,
+        issue_date, 
+        expiry_date, 
+        status,
+        created_at,
+        updated_at
+    ) VALUES (
+        :business_permit_id, 
+        :business_name, 
+        :owner_name, 
+        :business_type,
+        :tax_calculation_type,
+        :taxable_amount, 
+        :tax_rate, 
+        :tax_amount, 
+        :regulatory_fees, 
+        :total_tax,
+        :tax_calculated,
+        :tax_approved,
+        :address, 
+        :contact_number, 
+        :phone,
+        :issue_date, 
+        :expiry_date, 
+        :status,
+        NOW(),
+        NOW()
+    )";
+
+    $stmt = $pdo->prepare($sql);
     
-    if ($result) {
-        $lastId = $result['business_permit_id'];
-        $parts = explode('-', $lastId);
-        $lastNumber = intval($parts[2]);
-        $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
-    } else {
-        $newNumber = '001';
-    }
+    $params = [
+        ':business_permit_id' => htmlspecialchars($business_permit_id),
+        ':business_name' => htmlspecialchars($input['business_name']),
+        ':owner_name' => htmlspecialchars($input['owner_name']),
+        ':business_type' => htmlspecialchars($business_type),
+        ':tax_calculation_type' => $tax_calculation_type,
+        ':taxable_amount' => $taxable_amount,
+        ':tax_rate' => $taxResult['tax_rate'],
+        ':tax_amount' => $taxResult['tax_amount'],
+        ':regulatory_fees' => $taxResult['regulatory_fees'],
+        ':total_tax' => $taxResult['total_tax'],
+        ':tax_calculated' => 1,
+        ':tax_approved' => 0,
+        ':address' => isset($input['address']) ? htmlspecialchars($input['address']) : '',
+        ':contact_number' => isset($input['contact_number']) ? htmlspecialchars($input['contact_number']) : '',
+        ':phone' => isset($input['phone']) ? htmlspecialchars($input['phone']) : (isset($input['contact_number']) ? htmlspecialchars($input['contact_number']) : ''),
+        ':issue_date' => isset($input['issue_date']) ? $input['issue_date'] : date('Y-m-d'),
+        ':expiry_date' => isset($input['expiry_date']) ? $input['expiry_date'] : date('Y-m-d', strtotime('+1 year')),
+        ':status' => isset($input['status']) ? $input['status'] : 'Pending'
+    ];
+
+    $stmt->execute($params);
+    $recordId = $pdo->lastInsertId();
     
-    return "BP-{$currentYear}-{$newNumber}";
+    $taxResult['record_id'] = $recordId;
+    $taxResult['action'] = 'created';
+    
+    return $taxResult;
 }
 
-// ==================== AUTOMATIC TAX CALCULATION ====================
-function calculateTaxAssessment($pdo, $permitData) {
+// ==================== UPDATE EXISTING BUSINESS TAX RECORD ====================
+function updateBusinessTax($pdo, $business_permit_id, $input) {
+    $tax_calculation_type = $input['tax_calculation_type'];
+    $taxable_amount = floatval($input['taxable_amount']);
+    $business_type = $input['business_type'];
+    
+    // Calculate taxes
+    $taxResult = calculateTaxes($business_type, $taxable_amount, $tax_calculation_type);
+    
+    // Update existing record
+    $sql = "UPDATE business_permits SET
+        business_name = :business_name, 
+        owner_name = :owner_name, 
+        business_type = :business_type,
+        tax_calculation_type = :tax_calculation_type,
+        taxable_amount = :taxable_amount, 
+        tax_rate = :tax_rate, 
+        tax_amount = :tax_amount, 
+        regulatory_fees = :regulatory_fees, 
+        total_tax = :total_tax,
+        tax_calculated = :tax_calculated,
+        address = :address, 
+        contact_number = :contact_number, 
+        phone = :phone,
+        issue_date = :issue_date, 
+        expiry_date = :expiry_date, 
+        status = :status,
+        updated_at = NOW()
+        WHERE business_permit_id = :business_permit_id";
+
+    $stmt = $pdo->prepare($sql);
+    
+    $params = [
+        ':business_permit_id' => htmlspecialchars($business_permit_id),
+        ':business_name' => htmlspecialchars($input['business_name']),
+        ':owner_name' => htmlspecialchars($input['owner_name']),
+        ':business_type' => htmlspecialchars($business_type),
+        ':tax_calculation_type' => $tax_calculation_type,
+        ':taxable_amount' => $taxable_amount,
+        ':tax_rate' => $taxResult['tax_rate'],
+        ':tax_amount' => $taxResult['tax_amount'],
+        ':regulatory_fees' => $taxResult['regulatory_fees'],
+        ':total_tax' => $taxResult['total_tax'],
+        ':tax_calculated' => 1,
+        ':address' => isset($input['address']) ? htmlspecialchars($input['address']) : '',
+        ':contact_number' => isset($input['contact_number']) ? htmlspecialchars($input['contact_number']) : '',
+        ':phone' => isset($input['phone']) ? htmlspecialchars($input['phone']) : (isset($input['contact_number']) ? htmlspecialchars($input['contact_number']) : ''),
+        ':issue_date' => isset($input['issue_date']) ? $input['issue_date'] : date('Y-m-d'),
+        ':expiry_date' => isset($input['expiry_date']) ? $input['expiry_date'] : date('Y-m-d', strtotime('+1 year')),
+        ':status' => isset($input['status']) ? $input['status'] : 'Pending'
+    ];
+
+    $stmt->execute($params);
+    
+    $taxResult['action'] = 'updated';
+    
+    return $taxResult;
+}
+
+// ==================== TAX CALCULATION FUNCTION ====================
+function calculateTaxes($businessType, $taxableAmount, $calculationType) {
+    global $pdo;
+    
     try {
-        // Get business tax rate
-        $taxRateQuery = "SELECT tax_rate FROM business_tax_rate_config 
-                        WHERE business_type = :business_type 
-                        AND (expiration_date IS NULL OR expiration_date >= CURDATE())
-                        ORDER BY effective_date DESC LIMIT 1";
-        $taxRateStmt = $pdo->prepare($taxRateQuery);
-        $taxRateStmt->execute([':business_type' => $permitData['business_type']]);
-        $taxRate = $taxRateStmt->fetch(PDO::FETCH_ASSOC);
+        $taxRate = 0;
+        $taxAmount = 0;
         
-        // Get capital investment tax rate
-        $capitalTaxQuery = "SELECT tax_percent FROM capital_investment_tax_config 
-                           WHERE :capital BETWEEN min_capital AND max_capital
-                           AND (expiration_date IS NULL OR expiration_date >= CURDATE())
-                           ORDER BY effective_date DESC LIMIT 1";
-        $capitalTaxStmt = $pdo->prepare($capitalTaxQuery);
-        $capitalTaxStmt->execute([':capital' => $permitData['capital_investment']]);
-        $capitalTax = $capitalTaxStmt->fetch(PDO::FETCH_ASSOC);
+        if ($calculationType === 'capital_investment') {
+            // Calculate capital investment tax
+            $capitalTaxQuery = "SELECT tax_percent FROM capital_investment_tax_config 
+                               WHERE :amount >= min_amount AND :amount <= max_amount
+                               AND (
+                                   expiration_date IS NULL 
+                                   OR expiration_date = '' 
+                                   OR expiration_date = '0000-00-00' 
+                                   OR expiration_date >= CURDATE()
+                               )
+                               ORDER BY effective_date DESC LIMIT 1";
+            
+            $capitalTaxStmt = $pdo->prepare($capitalTaxQuery);
+            $capitalTaxStmt->execute([':amount' => $taxableAmount]);
+            $capitalTax = $capitalTaxStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($capitalTax) {
+                $taxRate = floatval($capitalTax['tax_percent']);
+                $taxAmount = $taxableAmount * ($taxRate / 100);
+            }
+            
+        } elseif ($calculationType === 'gross_sales') {
+            // Calculate gross sales tax
+            $grossTaxQuery = "SELECT tax_percent FROM gross_sales_tax_config 
+                             WHERE business_type = :business_type
+                             AND (
+                                 expiration_date IS NULL 
+                                 OR expiration_date = '' 
+                                 OR expiration_date = '0000-00-00' 
+                                 OR expiration_date >= CURDATE()
+                             )
+                             ORDER BY effective_date DESC LIMIT 1";
+            
+            $grossTaxStmt = $pdo->prepare($grossTaxQuery);
+            $grossTaxStmt->execute([':business_type' => $businessType]);
+            $grossTax = $grossTaxStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($grossTax) {
+                $taxRate = floatval($grossTax['tax_percent']);
+                $taxAmount = $taxableAmount * ($taxRate / 100);
+            }
+        }
         
-        // Get regulatory fees
+        // Get regulatory fees (sum all active regulatory fees)
         $regulatoryQuery = "SELECT SUM(amount) as total_fees FROM regulatory_fee_config 
-                           WHERE (business_type = :business_type OR business_type = 'All')
-                           AND (expiration_date IS NULL OR expiration_date >= CURDATE())";
+                           WHERE (
+                               expiration_date IS NULL 
+                               OR expiration_date = '' 
+                               OR expiration_date = '0000-00-00' 
+                               OR expiration_date >= CURDATE()
+                           )";
+        
         $regulatoryStmt = $pdo->prepare($regulatoryQuery);
-        $regulatoryStmt->execute([':business_type' => $permitData['business_type']]);
+        $regulatoryStmt->execute();
         $regulatoryFees = $regulatoryStmt->fetch(PDO::FETCH_ASSOC);
         
-        // Calculate taxes
-        $businessTax = $permitData['gross_sales'] * ($taxRate['tax_rate'] / 100);
-        $capitalTaxAmount = $permitData['capital_investment'] * ($capitalTax['tax_percent'] / 100);
-        $totalRegulatory = $regulatoryFees['total_fees'] ?? 999.98; // Default if not found
+        $totalRegulatory = $regulatoryFees['total_fees'] ?? 0;
         
-        $totalAnnualTax = $businessTax + $capitalTaxAmount + $totalRegulatory;
+        // Calculate total tax
+        $totalTax = $taxAmount + $totalRegulatory;
         
-        // Save tax assessment
-        $assessmentSql = "INSERT INTO business_tax_assessments (
-            business_permit_id, 
-            assessment_date, 
-            capital_investment, 
-            gross_sales, 
-            capital_tax, 
-            business_tax, 
-            regulatory_fees, 
-            total_annual_tax,
-            created_at
-        ) VALUES (
-            :business_permit_id, 
-            CURDATE(), 
-            :capital_investment, 
-            :gross_sales, 
-            :capital_tax, 
-            :business_tax, 
-            :regulatory_fees, 
-            :total_annual_tax,
-            NOW()
-        )";
-        
-        $assessmentStmt = $pdo->prepare($assessmentSql);
-        $assessmentStmt->execute([
-            ':business_permit_id' => $permitData['business_permit_id'],
-            ':capital_investment' => $permitData['capital_investment'],
-            ':gross_sales' => $permitData['gross_sales'] ?? 0,
-            ':capital_tax' => $capitalTaxAmount,
-            ':business_tax' => $businessTax,
-            ':regulatory_fees' => $totalRegulatory,
-            ':total_annual_tax' => $totalAnnualTax
-        ]);
-        
-        return $pdo->lastInsertId();
+        return [
+            'tax_rate' => $taxRate,
+            'tax_amount' => $taxAmount,
+            'regulatory_fees' => $totalRegulatory,
+            'total_tax' => $totalTax,
+            'calculation_type' => $calculationType
+        ];
         
     } catch (Exception $e) {
         error_log("Tax Calculation Error: " . $e->getMessage());
-        return null;
+        
+        // Return default values if calculation fails
+        return [
+            'tax_rate' => 0,
+            'tax_amount' => 0,
+            'regulatory_fees' => 0,
+            'total_tax' => 0,
+            'calculation_type' => $calculationType,
+            'error' => $e->getMessage()
+        ];
     }
 }
-
 ?>

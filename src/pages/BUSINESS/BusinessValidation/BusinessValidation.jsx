@@ -14,8 +14,7 @@ const BusinessValidation = () => {
     try {
       setLoading(true);
       setError('');
-     // Change this line in fetchPermits function:
-    const response = await fetch('http://localhost/revenue/backend/Business/BusinessValidation/get_permits.php');
+      const response = await fetch('http://localhost/revenue/backend/Business/BusinessValidation/get_permits.php');
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -119,9 +118,9 @@ const BusinessValidation = () => {
     <div className='mx-1 mt-1 p-6 dark:bg-slate-900 bg-white dark:text-slate-300 rounded-lg'>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Business Validation</h1>
+          <h1 className="text-2xl font-bold">Business Permit Validation</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage and validate business permits
+            Review and validate pending business permit applications
           </p>
         </div>
         <div className="flex items-center space-x-2 mt-4 md:mt-0">
@@ -148,7 +147,7 @@ const BusinessValidation = () => {
           </div>
           <input
             type="text"
-            placeholder="Search by business name, owner, permit ID, or address..."
+            placeholder="Search pending permits by business name, owner, permit ID, or address..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -177,33 +176,33 @@ const BusinessValidation = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400 mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading business permits...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading pending business permits...</p>
         </div>
       ) : (
         <>
           {/* Stats Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
               <div className="text-2xl font-bold">{permits.length}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Permits</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Pending Applications</div>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+              <div className="text-2xl font-bold">
+                {permits.filter(p => p.tax_calculated === 1).length}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Tax Calculated</div>
             </div>
             <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
               <div className="text-2xl font-bold">
-                {permits.filter(p => p.status === 'Active').length}
+                {permits.filter(p => p.tax_approved === 1).length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Active</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Tax Approved</div>
             </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+            <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
               <div className="text-2xl font-bold">
-                {permits.filter(p => p.status === 'Pending').length}
+                {permits.filter(p => p.tax_calculation_type === 'capital_investment').length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
-            </div>
-            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-              <div className="text-2xl font-bold">
-                {permits.filter(p => p.status === 'Expired').length}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Expired</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Capital Investment</div>
             </div>
           </div>
 
@@ -216,7 +215,7 @@ const BusinessValidation = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Business Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Owner</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capital</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Taxable Amount</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Issue Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
@@ -231,12 +230,13 @@ const BusinessValidation = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900 dark:text-gray-300">{permit.business_name}</div>
-                        {permit.is_renewal && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400">Renewal</span>
-                        )}
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {permit.tax_calculation_type === 'capital_investment' ? 'Capital Investment' : 'Gross Sales'}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-gray-300">{permit.owner_name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{permit.contact_number}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(permit.business_type)}`}>
@@ -244,12 +244,18 @@ const BusinessValidation = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-gray-300">{formatCurrency(permit.capital_investment)}</div>
+                        <div className="text-sm text-gray-900 dark:text-gray-300">{formatCurrency(permit.taxable_amount)}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Tax: {formatCurrency(permit.tax_amount || 0)}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(permit.status)}`}>
                           {permit.status}
                         </span>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {permit.tax_calculated === 1 ? 'Tax Calculated' : 'Tax Not Calculated'}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-gray-300">{formatDate(permit.issue_date)}</div>
@@ -257,11 +263,11 @@ const BusinessValidation = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <Link
-                        to={`/business/businessvalidationinfo/${permit.id}`}
-  className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3"
-  title="View Details"
+                          to={`/business/businessvalidationinfo/${permit.id}`}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3 inline-flex items-center"
+                          title="View and Validate"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                             <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                           </svg>
@@ -274,7 +280,10 @@ const BusinessValidation = () => {
                   <tr>
                     <td colSpan="8" className="px-6 py-12 text-center">
                       <div className="text-gray-500 dark:text-gray-400">
-                        {searchTerm ? 'No matching permits found' : 'No business permits available'}
+                        {searchTerm ? 'No matching pending permits found' : 'No pending business permit applications'}
+                        <div className="mt-2 text-sm">
+                          All pending permits have been processed or there are no new applications.
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -300,7 +309,7 @@ const BusinessValidation = () => {
               </select>
               <span className="text-sm text-gray-600 dark:text-gray-400">entries</span>
               <span className="text-sm text-gray-600 dark:text-gray-400 ml-4">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredPermits.length)} of {filteredPermits.length} results
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredPermits.length)} of {filteredPermits.length} pending permits
               </span>
             </div>
 
