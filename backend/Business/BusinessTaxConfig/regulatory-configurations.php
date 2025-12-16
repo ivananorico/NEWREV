@@ -1,9 +1,8 @@
 <?php
 // Enable CORS with proper headers
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
 // Handle preflight OPTIONS request
@@ -16,225 +15,277 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 require_once '../../../db/Business/business_db.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
+$currentDate = isset($_GET['current_date']) ? $_GET['current_date'] : date('Y-m-d');
 
-switch ($method) {
-    case 'GET':
-        getRegulatoryConfigurations();
-        break;
-    case 'POST':
-        createRegulatoryConfiguration();
-        break;
-    case 'PUT':
-        updateRegulatoryConfiguration();
-        break;
-    case 'PATCH':
-        patchRegulatoryConfiguration();
-        break;
-    case 'DELETE':
-        deleteRegulatoryConfiguration();
-        break;
-    default:
-        http_response_code(405);
-        echo json_encode(["error" => "Method not allowed"]);
-}
-
-function getRegulatoryConfigurations() {
-    global $pdo;
-    
-    $currentDate = isset($_GET['current_date']) ? $_GET['current_date'] : date('Y-m-d');
-    
-    try {
-        $stmt = $pdo->prepare("
-            SELECT * FROM regulatory_fee_config 
-            WHERE effective_date <= ? 
-            AND (expiration_date IS NULL OR expiration_date >= ?)
-            ORDER BY fee_name, business_type
-        ");
-        $stmt->execute([$currentDate, $currentDate]);
-        $configurations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    if ($method === 'GET') {
+        $id = isset($_GET['id']) ? intval($_GET['id']) : null;
         
-        echo json_encode($configurations);
-        
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Database error: " . $e->getMessage()]);
-    }
-}
-
-function createRegulatoryConfiguration() {
-    global $pdo;
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(["error" => "Invalid JSON data"]);
-        return;
-    }
-    
-    // Validate required fields
-    $required = ['fee_name', 'amount', 'effective_date'];
-    foreach ($required as $field) {
-        if (!isset($input[$field])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Missing required field: $field"]);
-            return;
+        if ($id) {
+            $stmt = $pdo->prepare("SELECT * FROM regulatory_fee_config WHERE id = ?");
+            $stmt->execute([$id]);
+            $config = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($config) {
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Regulatory configuration retrieved',
+                    'data' => $config
+                ]);
+            } else {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Configuration not found',
+                    'data' => null
+                ]);
+            }
+        } else {
+            // FIXED: Handle '0000-00-00' dates
+            $stmt = $pdo->prepare("
+                SELECT * FROM regulatory_fee_config 
+                WHERE effective_date <= ? 
+                AND (
+                    expiration_date IS NULL 
+                    OR expiration_date = '' 
+                    OR expiration_date = '0000-00-00' 
+                    OR expiration_date = '0000-00-00 00:00:00'
+                    OR expiration_date >= ?
+                )
+                ORDER BY fee_name, effective_date DESC
+            ");
+            $stmt->execute([$currentDate, $currentDate]);
+            $configs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Debug log
+            error_log("Fetched " . count($configs) . " regulatory fee configurations for date: $currentDate");
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'Regulatory fee configurations retrieved',
+                'data' => $configs
+            ]);
         }
     }
     
-    try {
+    elseif ($method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$input) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid JSON data',
+                'data' => null
+            ]);
+            exit();
+        }
+        
+        $required = ['fee_name', 'amount', 'effective_date'];
+        foreach ($required as $field) {
+            if (!isset($input[$field])) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => "Missing required field: $field",
+                    'data' => null
+                ]);
+                exit();
+            }
+        }
+        
+        // Convert empty expiration_date to NULL
+        if (isset($input['expiration_date']) && (empty($input['expiration_date']) || $input['expiration_date'] == '0000-00-00')) {
+            $input['expiration_date'] = null;
+        }
+        
         $stmt = $pdo->prepare("
-            INSERT INTO regulatory_fee_config (
-                fee_name, business_type, amount, effective_date, expiration_date, remarks
-            ) VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO regulatory_fee_config 
+            (fee_name, amount, effective_date, expiration_date, remarks) 
+            VALUES (?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
             $input['fee_name'],
-            !empty($input['business_type']) ? $input['business_type'] : null,
             $input['amount'],
             $input['effective_date'],
-            !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            !empty($input['remarks']) ? $input['remarks'] : null
+            $input['expiration_date'] ?? null,
+            $input['remarks'] ?? null
         ]);
         
         echo json_encode([
-            "message" => "Regulatory configuration created successfully", 
-            "id" => $pdo->lastInsertId()
+            'success' => true,
+            'message' => 'Regulatory configuration created successfully',
+            'data' => ['id' => $pdo->lastInsertId()]
         ]);
-        
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to create regulatory configuration: " . $e->getMessage()]);
-    }
-}
-
-function updateRegulatoryConfiguration() {
-    global $pdo;
-    
-    $id = $_GET['id'] ?? null;
-    if (!$id) {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID parameter"]);
-        return;
     }
     
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(["error" => "Invalid JSON data"]);
-        return;
-    }
-    
-    try {
-        $stmt = $pdo->prepare("
-            UPDATE regulatory_fee_config SET 
-                fee_name = ?, business_type = ?, amount = ?, 
-                effective_date = ?, expiration_date = ?, remarks = ?
-            WHERE id = ?
-        ");
+    elseif ($method === 'PUT') {
+        $id = isset($_GET['id']) ? intval($_GET['id']) : null;
         
-        $stmt->execute([
-            $input['fee_name'],
-            !empty($input['business_type']) ? $input['business_type'] : null,
-            $input['amount'],
-            $input['effective_date'],
-            !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            !empty($input['remarks']) ? $input['remarks'] : null,
-            $id
-        ]);
-        
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Regulatory configuration updated successfully"]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["error" => "Regulatory configuration not found"]);
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Configuration ID is required',
+                'data' => null
+            ]);
+            exit();
         }
         
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to update regulatory configuration: " . $e->getMessage()]);
-    }
-}
-
-function patchRegulatoryConfiguration() {
-    global $pdo;
-    
-    $id = $_GET['id'] ?? null;
-    if (!$id) {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID parameter"]);
-        return;
-    }
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(["error" => "Invalid JSON data"]);
-        return;
-    }
-    
-    $fields = [];
-    $values = [];
-    
-    $allowedFields = ['expiration_date', 'amount', 'business_type'];
-    foreach ($allowedFields as $field) {
-        if (isset($input[$field])) {
-            $fields[] = "$field = ?";
-            $values[] = $input[$field];
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$input) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid JSON data',
+                'data' => null
+            ]);
+            exit();
         }
-    }
-    
-    if (empty($fields)) {
-        http_response_code(400);
-        echo json_encode(["error" => "No valid fields to update"]);
-        return;
-    }
-    
-    $values[] = $id;
-    $sql = "UPDATE regulatory_fee_config SET " . implode(', ', $fields) . " WHERE id = ?";
-    
-    try {
+        
+        // Convert empty expiration_date to NULL
+        if (isset($input['expiration_date']) && (empty($input['expiration_date']) || $input['expiration_date'] == '0000-00-00')) {
+            $input['expiration_date'] = null;
+        }
+        
+        $fields = [];
+        $values = [];
+        
+        if (isset($input['fee_name'])) {
+            $fields[] = "fee_name = ?";
+            $values[] = $input['fee_name'];
+        }
+        
+        if (isset($input['amount'])) {
+            $fields[] = "amount = ?";
+            $values[] = $input['amount'];
+        }
+        
+        if (isset($input['effective_date'])) {
+            $fields[] = "effective_date = ?";
+            $values[] = $input['effective_date'];
+        }
+        
+        if (isset($input['expiration_date'])) {
+            $fields[] = "expiration_date = ?";
+            $values[] = $input['expiration_date'];
+        }
+        
+        if (isset($input['remarks'])) {
+            $fields[] = "remarks = ?";
+            $values[] = $input['remarks'];
+        }
+        
+        if (empty($fields)) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'No fields to update',
+                'data' => null
+            ]);
+            exit();
+        }
+        
+        $values[] = $id;
+        
+        $sql = "UPDATE regulatory_fee_config SET " . implode(', ', $fields) . " WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($values);
         
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Regulatory configuration updated successfully"]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["error" => "Regulatory configuration not found"]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Regulatory configuration updated successfully',
+            'data' => null
+        ]);
+    }
+    
+    elseif ($method === 'DELETE') {
+        $id = isset($_GET['id']) ? intval($_GET['id']) : null;
+        
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Configuration ID is required',
+                'data' => null
+            ]);
+            exit();
         }
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to update regulatory configuration: " . $e->getMessage()]);
-    }
-}
-
-function deleteRegulatoryConfiguration() {
-    global $pdo;
-    
-    $id = $_GET['id'] ?? null;
-    if (!$id) {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID parameter"]);
-        return;
-    }
-    
-    try {
+        
         $stmt = $pdo->prepare("DELETE FROM regulatory_fee_config WHERE id = ?");
         $stmt->execute([$id]);
         
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Regulatory configuration deleted successfully"]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["error" => "Regulatory configuration not found"]);
-        }
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to delete regulatory configuration: " . $e->getMessage()]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Regulatory configuration deleted successfully',
+            'data' => null
+        ]);
     }
+    
+    elseif ($method === 'PATCH') {
+        $id = isset($_GET['id']) ? intval($_GET['id']) : null;
+        
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Configuration ID is required',
+                'data' => null
+            ]);
+            exit();
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$input) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid JSON data',
+                'data' => null
+            ]);
+            exit();
+        }
+        
+        $expirationDate = $input['expiration_date'] ?? date('Y-m-d');
+        
+        $stmt = $pdo->prepare("
+            UPDATE regulatory_fee_config 
+            SET expiration_date = ? 
+            WHERE id = ?
+        ");
+        $stmt->execute([$expirationDate, $id]);
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Regulatory configuration expired successfully',
+            'data' => null
+        ]);
+    }
+    
+    else {
+        http_response_code(405);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Method not allowed',
+            'data' => null
+        ]);
+    }
+    
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database error: ' . $e->getMessage(),
+        'data' => null
+    ]);
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Server error: ' . $e->getMessage(),
+        'data' => null
+    ]);
 }
-?>

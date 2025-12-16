@@ -23,7 +23,7 @@ const sidebarItems = [
     label: "Business Tax Collection Systems",
     icon: LayoutDashboard,
     subItems: [
-      { id: "business1", label: "Business Tax Configuration", path: "/BUSINESS/BusinessTaxConfig" },
+      { id: "BusinessTaxConfig", label: "Business Tax Configuration", path: "/BUSINESS/BusinessTaxConfig" },
       { id: "BusinessValidation", label: "BusinessValidation", path: "/BUSINESS/BusinessValidation" },
     ]
   },

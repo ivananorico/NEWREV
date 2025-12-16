@@ -1,44 +1,42 @@
 import { useState, useEffect } from 'react';
 
-export default function BUSINESS1() {
+export default function BusinessTaxConfig() {
   const [activeTab, setActiveTab] = useState('business');
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  // Business Configuration State (Gross Sales/Receipts)
+  // Initialize all states as empty arrays
   const [businessConfigs, setBusinessConfigs] = useState([]);
   const [businessForm, setBusinessForm] = useState({
     business_type: '',
-    tax_rate: '',
-    effective_date: new Date().toISOString().split('T')[0],
-    expiration_date: '',
-    remarks: ''
-  });
-
-  // Capital Investment Configuration State
-  const [capitalConfigs, setCapitalConfigs] = useState([]);
-  const [capitalForm, setCapitalForm] = useState({
-    min_capital: '',
-    max_capital: '',
     tax_percent: '',
     effective_date: new Date().toISOString().split('T')[0],
     expiration_date: '',
     remarks: ''
   });
 
-  // Regulatory Configuration State
+  const [capitalConfigs, setCapitalConfigs] = useState([]);
+  const [capitalForm, setCapitalForm] = useState({
+    min_amount: '',
+    max_amount: '',
+    tax_percent: '',
+    effective_date: new Date().toISOString().split('T')[0],
+    expiration_date: '',
+    remarks: ''
+  });
+
   const [regulatoryConfigs, setRegulatoryConfigs] = useState([]);
   const [regulatoryForm, setRegulatoryForm] = useState({
     fee_name: '',
-    business_type: '',
     amount: '',
     effective_date: new Date().toISOString().split('T')[0],
     expiration_date: '',
     remarks: ''
   });
 
-  // Penalty Configuration State
   const [penaltyConfigs, setPenaltyConfigs] = useState([]);
   const [penaltyForm, setPenaltyForm] = useState({
     penalty_percent: '',
@@ -47,7 +45,6 @@ export default function BUSINESS1() {
     remarks: ''
   });
 
-  // Discount Configuration State
   const [discountConfigs, setDiscountConfigs] = useState([]);
   const [discountForm, setDiscountForm] = useState({
     discount_percent: '',
@@ -61,73 +58,162 @@ export default function BUSINESS1() {
 
   const API_BASE = "http://localhost/revenue/backend/Business/BusinessTaxConfig";
 
+  // Helper to normalize database dates
+  const normalizeDate = (dateStr) => {
+    if (!dateStr || dateStr === '0000-00-00' || dateStr === '0000-00-00 00:00:00') {
+      return null;
+    }
+    return dateStr;
+  };
+
+  // PROPER JSON FETCH HELPER
+  const fetchData = async (endpoint, setData) => {
+    try {
+      console.log(`Fetching from: ${API_BASE}/${endpoint}.php?current_date=${currentDate}`);
+      const response = await fetch(`${API_BASE}/${endpoint}.php?current_date=${currentDate}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // First check if response is valid JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.warn(`Response from ${endpoint} is not JSON:`, text.substring(0, 200));
+        throw new Error(`Expected JSON but got: ${contentType}`);
+      }
+      
+      // Parse JSON response
+      const result = await response.json();
+      console.log(`API Response from ${endpoint}:`, result);
+      
+      let dataArray = [];
+      
+      // Handle JSON response based on structure
+      if (Array.isArray(result)) {
+        // Case 1: Direct JSON array
+        dataArray = result;
+      } else if (result && typeof result === 'object') {
+        // Case 2: JSON object with common structures
+        if (result.data !== undefined) {
+          // If data is an array
+          if (Array.isArray(result.data)) {
+            dataArray = result.data;
+          } 
+          // If data is a single object, wrap in array
+          else if (typeof result.data === 'object' && result.data !== null) {
+            dataArray = [result.data];
+          }
+          // If data is null or undefined
+          else if (result.data === null || result.data === undefined) {
+            dataArray = [];
+          }
+        } 
+        // Case 3: Check for success/data pattern
+        else if (result.success !== undefined && result.data !== undefined) {
+          if (Array.isArray(result.data)) {
+            dataArray = result.data;
+          } else if (typeof result.data === 'object' && result.data !== null) {
+            dataArray = [result.data];
+          }
+        }
+        // Case 4: Object with other array properties
+        else {
+          // Look for any array property
+          const arrayKeys = Object.keys(result).filter(key => Array.isArray(result[key]));
+          if (arrayKeys.length > 0) {
+            dataArray = result[arrayKeys[0]];
+          }
+          // If no array found but has id property (single object)
+          else if (result.id !== undefined) {
+            dataArray = [result];
+          }
+        }
+      }
+      
+      // If still no data, try to extract from root properties
+      if (dataArray.length === 0 && result && typeof result === 'object') {
+        const entries = Object.entries(result);
+        if (entries.length > 0 && Array.isArray(entries[0][1])) {
+          dataArray = entries[0][1];
+        }
+      }
+      
+      console.log(`Parsed JSON data for ${endpoint}:`, dataArray);
+      
+      // Normalize dates in the data
+      if (Array.isArray(dataArray)) {
+        dataArray = dataArray.map(item => ({
+          ...item,
+          expiration_date: normalizeDate(item.expiration_date)
+        }));
+      } else {
+        console.error(`Expected array but got:`, typeof dataArray, dataArray);
+        dataArray = [];
+      }
+      
+      setData(dataArray);
+      return dataArray;
+    } catch (error) {
+      console.error(`Error fetching ${endpoint}:`, error);
+      setData([]);
+      setError(`Failed to load ${endpoint}: ${error.message}`);
+      return [];
+    }
+  };
+
   // Fetch all configurations
   const fetchBusinessConfigs = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE}/business-configurations.php?current_date=${currentDate}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setBusinessConfigs(data);
-      setError(null);
-    } catch (error) {
-      console.error('Error fetching business configurations:', error);
-      setError('Failed to load business configurations: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    return await fetchData('business-configurations', setBusinessConfigs);
   };
 
   const fetchCapitalConfigs = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/capital-configurations.php?current_date=${currentDate}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setCapitalConfigs(data);
-    } catch (error) {
-      console.error('Error fetching capital configurations:', error);
-    }
+    return await fetchData('capital-configurations', setCapitalConfigs);
   };
 
   const fetchRegulatoryConfigs = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/regulatory-configurations.php?current_date=${currentDate}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setRegulatoryConfigs(data);
-    } catch (error) {
-      console.error('Error fetching regulatory configurations:', error);
-    }
+    return await fetchData('regulatory-configurations', setRegulatoryConfigs);
   };
 
   const fetchPenaltyConfigs = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/penalty-configurations.php?current_date=${currentDate}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setPenaltyConfigs(data);
-    } catch (error) {
-      console.error('Error fetching penalty configurations:', error);
-    }
+    return await fetchData('penalty-configurations', setPenaltyConfigs);
   };
 
   const fetchDiscountConfigs = async () => {
+    return await fetchData('discount-configurations', setDiscountConfigs);
+  };
+
+  // Fetch all configurations
+  const fetchAllConfigs = async () => {
     try {
-      const response = await fetch(`${API_BASE}/discount-configurations.php?current_date=${currentDate}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setDiscountConfigs(data);
+      await Promise.all([
+        fetchBusinessConfigs(),
+        fetchCapitalConfigs(),
+        fetchRegulatoryConfigs(),
+        fetchPenaltyConfigs(),
+        fetchDiscountConfigs()
+      ]);
     } catch (error) {
-      console.error('Error fetching discount configurations:', error);
+      console.error('Error fetching all configurations:', error);
+      throw error;
     }
   };
 
   useEffect(() => {
-    fetchBusinessConfigs();
-    fetchCapitalConfigs();
-    fetchRegulatoryConfigs();
-    fetchPenaltyConfigs();
-    fetchDiscountConfigs();
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await fetchAllConfigs();
+      } catch (error) {
+        setError('Failed to load configurations: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, [currentDate]);
 
   // Business Configuration Handlers
@@ -140,6 +226,7 @@ export default function BUSINESS1() {
     const method = editingId ? 'PUT' : 'POST';
 
     try {
+      setSubmitting(true);
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -148,25 +235,39 @@ export default function BUSINESS1() {
         body: JSON.stringify(businessForm)
       });
 
-      const result = await response.json();
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
+      
+      console.log('Business API Response:', result);
       
       if (response.ok) {
-        fetchBusinessConfigs();
+        // Refresh from server
+        await fetchBusinessConfigs();
         resetBusinessForm();
-        alert(editingId ? 'Business tax updated successfully!' : 'Business tax created successfully!');
+        setSuccessMessage(editingId ? 'Business tax updated successfully!' : 'Business tax created successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        alert('Error: ' + result.error);
+        alert('Error: ' + (result.message || result.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error saving business configuration:', error);
-      alert('Error saving business configuration');
+      alert('Error saving business configuration: ' + error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleBusinessEdit = (config) => {
     setBusinessForm({
       business_type: config.business_type || '',
-      tax_rate: config.tax_rate || '',
+      tax_percent: config.tax_percent || '',
       effective_date: config.effective_date || new Date().toISOString().split('T')[0],
       expiration_date: config.expiration_date || '',
       remarks: config.remarks || ''
@@ -185,12 +286,13 @@ export default function BUSINESS1() {
     const method = editingId ? 'PUT' : 'POST';
 
     // Validate that min capital is less than max capital
-    if (parseFloat(capitalForm.min_capital) >= parseFloat(capitalForm.max_capital)) {
+    if (parseFloat(capitalForm.min_amount) >= parseFloat(capitalForm.max_amount)) {
       alert('Minimum capital must be less than maximum capital');
       return;
     }
 
     try {
+      setSubmitting(true);
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -199,25 +301,38 @@ export default function BUSINESS1() {
         body: JSON.stringify(capitalForm)
       });
 
-      const result = await response.json();
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
+      
+      console.log('Capital API Response:', result);
       
       if (response.ok) {
-        fetchCapitalConfigs();
+        await fetchCapitalConfigs();
         resetCapitalForm();
-        alert(editingId ? 'Capital investment tax updated successfully!' : 'Capital investment tax created successfully!');
+        setSuccessMessage(editingId ? 'Capital investment tax updated successfully!' : 'Capital investment tax created successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        alert('Error: ' + result.error);
+        alert('Error: ' + (result.message || result.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error saving capital configuration:', error);
-      alert('Error saving capital configuration');
+      alert('Error saving capital configuration: ' + error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCapitalEdit = (config) => {
     setCapitalForm({
-      min_capital: config.min_capital || '',
-      max_capital: config.max_capital || '',
+      min_amount: config.min_amount || '',
+      max_amount: config.max_amount || '',
       tax_percent: config.tax_percent || '',
       effective_date: config.effective_date || new Date().toISOString().split('T')[0],
       expiration_date: config.expiration_date || '',
@@ -237,6 +352,7 @@ export default function BUSINESS1() {
     const method = editingId ? 'PUT' : 'POST';
 
     try {
+      setSubmitting(true);
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -245,25 +361,37 @@ export default function BUSINESS1() {
         body: JSON.stringify(regulatoryForm)
       });
 
-      const result = await response.json();
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
+      
+      console.log('Regulatory API Response:', result);
       
       if (response.ok) {
-        fetchRegulatoryConfigs();
+        await fetchRegulatoryConfigs();
         resetRegulatoryForm();
-        alert(editingId ? 'Regulatory configuration updated successfully!' : 'Regulatory configuration created successfully!');
+        setSuccessMessage(editingId ? 'Regulatory configuration updated successfully!' : 'Regulatory configuration created successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        alert('Error: ' + result.error);
+        alert('Error: ' + (result.message || result.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error saving regulatory configuration:', error);
-      alert('Error saving regulatory configuration');
+      alert('Error saving regulatory configuration: ' + error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleRegulatoryEdit = (config) => {
     setRegulatoryForm({
       fee_name: config.fee_name || '',
-      business_type: config.business_type || '',
       amount: config.amount || '',
       effective_date: config.effective_date || new Date().toISOString().split('T')[0],
       expiration_date: config.expiration_date || '',
@@ -283,6 +411,7 @@ export default function BUSINESS1() {
     const method = editingId ? 'PUT' : 'POST';
 
     try {
+      setSubmitting(true);
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -291,18 +420,31 @@ export default function BUSINESS1() {
         body: JSON.stringify(penaltyForm)
       });
 
-      const result = await response.json();
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
+      
+      console.log('Penalty API Response:', result);
       
       if (response.ok) {
-        fetchPenaltyConfigs();
+        await fetchPenaltyConfigs();
         resetPenaltyForm();
-        alert(editingId ? 'Penalty configuration updated successfully!' : 'Penalty configuration created successfully!');
+        setSuccessMessage(editingId ? 'Penalty configuration updated successfully!' : 'Penalty configuration created successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        alert('Error: ' + result.error);
+        alert('Error: ' + (result.message || result.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error saving penalty configuration:', error);
-      alert('Error saving penalty configuration');
+      alert('Error saving penalty configuration: ' + error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -327,6 +469,7 @@ export default function BUSINESS1() {
     const method = editingId ? 'PUT' : 'POST';
 
     try {
+      setSubmitting(true);
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -335,18 +478,31 @@ export default function BUSINESS1() {
         body: JSON.stringify(discountForm)
       });
 
-      const result = await response.json();
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
+      
+      console.log('Discount API Response:', result);
       
       if (response.ok) {
-        fetchDiscountConfigs();
+        await fetchDiscountConfigs();
         resetDiscountForm();
-        alert(editingId ? 'Discount configuration updated successfully!' : 'Discount configuration created successfully!');
+        setSuccessMessage(editingId ? 'Discount configuration updated successfully!' : 'Discount configuration created successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        alert('Error: ' + result.error);
+        alert('Error: ' + (result.message || result.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error saving discount configuration:', error);
-      alert('Error saving discount configuration');
+      alert('Error saving discount configuration: ' + error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -370,34 +526,52 @@ export default function BUSINESS1() {
     
     if (window.confirm(`Are you sure you want to delete this ${typeName}?`)) {
       try {
+        setSubmitting(true);
         const endpoint = `${type}-configurations`;
         const response = await fetch(`${API_BASE}/${endpoint}.php?id=${id}`, {
           method: 'DELETE'
         });
 
+        // Check if response is JSON
+        const contentType = response.headers.get("content-type");
+        let result;
+        if (contentType && contentType.includes("application/json")) {
+          result = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+        }
+
         if (response.ok) {
+          // Refresh data
           switch (type) {
             case 'business':
-              fetchBusinessConfigs();
+              await fetchBusinessConfigs();
               break;
             case 'capital':
-              fetchCapitalConfigs();
+              await fetchCapitalConfigs();
               break;
             case 'regulatory':
-              fetchRegulatoryConfigs();
+              await fetchRegulatoryConfigs();
               break;
             case 'penalty':
-              fetchPenaltyConfigs();
+              await fetchPenaltyConfigs();
               break;
             case 'discount':
-              fetchDiscountConfigs();
+              await fetchDiscountConfigs();
               break;
           }
-          alert(`${typeName} deleted successfully!`);
+          
+          setSuccessMessage(`${typeName} deleted successfully!`);
+          setTimeout(() => setSuccessMessage(null), 3000);
+        } else {
+          alert('Error: ' + (result.message || result.error || 'Failed to delete'));
         }
       } catch (error) {
         console.error(`Error deleting ${type}:`, error);
-        alert('Error deleting configuration');
+        alert('Error deleting configuration: ' + error.message);
+      } finally {
+        setSubmitting(false);
       }
     }
   };
@@ -408,8 +582,11 @@ export default function BUSINESS1() {
                     type === 'regulatory' ? 'regulatory configuration' :
                     type === 'penalty' ? 'penalty configuration' : 'discount configuration';
     
+    const today = new Date().toISOString().split('T')[0];
+    
     if (window.confirm(`Are you sure you want to expire this ${typeName}?`)) {
       try {
+        setSubmitting(true);
         const endpoint = `${type}-configurations`;
         const response = await fetch(`${API_BASE}/${endpoint}.php?id=${id}`, {
           method: 'PATCH',
@@ -417,33 +594,50 @@ export default function BUSINESS1() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            expiration_date: new Date().toISOString().split('T')[0]
+            expiration_date: today
           })
         });
 
+        // Check if response is JSON
+        const contentType = response.headers.get("content-type");
+        let result;
+        if (contentType && contentType.includes("application/json")) {
+          result = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+        }
+
         if (response.ok) {
+          // Refresh data
           switch (type) {
             case 'business':
-              fetchBusinessConfigs();
+              await fetchBusinessConfigs();
               break;
             case 'capital':
-              fetchCapitalConfigs();
+              await fetchCapitalConfigs();
               break;
             case 'regulatory':
-              fetchRegulatoryConfigs();
+              await fetchRegulatoryConfigs();
               break;
             case 'penalty':
-              fetchPenaltyConfigs();
+              await fetchPenaltyConfigs();
               break;
             case 'discount':
-              fetchDiscountConfigs();
+              await fetchDiscountConfigs();
               break;
           }
-          alert(`${typeName} expired successfully!`);
+          
+          setSuccessMessage(`${typeName} expired successfully!`);
+          setTimeout(() => setSuccessMessage(null), 3000);
+        } else {
+          alert('Error: ' + (result.message || result.error || 'Failed to expire'));
         }
       } catch (error) {
         console.error(`Error expiring ${type}:`, error);
-        alert('Error expiring configuration');
+        alert('Error expiring configuration: ' + error.message);
+      } finally {
+        setSubmitting(false);
       }
     }
   };
@@ -452,7 +646,7 @@ export default function BUSINESS1() {
   const resetBusinessForm = () => {
     setBusinessForm({
       business_type: '',
-      tax_rate: '',
+      tax_percent: '',
       effective_date: new Date().toISOString().split('T')[0],
       expiration_date: '',
       remarks: ''
@@ -463,8 +657,8 @@ export default function BUSINESS1() {
 
   const resetCapitalForm = () => {
     setCapitalForm({
-      min_capital: '',
-      max_capital: '',
+      min_amount: '',
+      max_amount: '',
       tax_percent: '',
       effective_date: new Date().toISOString().split('T')[0],
       expiration_date: '',
@@ -477,7 +671,6 @@ export default function BUSINESS1() {
   const resetRegulatoryForm = () => {
     setRegulatoryForm({
       fee_name: '',
-      business_type: '',
       amount: '',
       effective_date: new Date().toISOString().split('T')[0],
       expiration_date: '',
@@ -509,22 +702,119 @@ export default function BUSINESS1() {
     setEditingType(null);
   };
 
-  // Statistics
-  const activeBusinessConfigs = businessConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
-  const expiredBusinessConfigs = businessConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
-  const activeCapitalConfigs = capitalConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
-  const expiredCapitalConfigs = capitalConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
-  const activeRegulatoryConfigs = regulatoryConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
-  const expiredRegulatoryConfigs = regulatoryConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
-  const activePenaltyConfigs = penaltyConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
-  const expiredPenaltyConfigs = penaltyConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
-  const activeDiscountConfigs = discountConfigs.filter(config => !config.expiration_date || new Date(config.expiration_date) > new Date()).length;
-  const expiredDiscountConfigs = discountConfigs.filter(config => config.expiration_date && new Date(config.expiration_date) <= new Date()).length;
+  // Statistics with safe array handling
+  const getSafeArray = (data) => Array.isArray(data) ? data : [];
+  
+  const businessConfigsSafe = getSafeArray(businessConfigs);
+  const capitalConfigsSafe = getSafeArray(capitalConfigs);
+  const regulatoryConfigsSafe = getSafeArray(regulatoryConfigs);
+  const penaltyConfigsSafe = getSafeArray(penaltyConfigs);
+  const discountConfigsSafe = getSafeArray(discountConfigs);
+
+  // Calculate statistics - handle empty or invalid dates
+  const calculateStats = (configs) => {
+    if (!Array.isArray(configs)) return { active: 0, expired: 0 };
+    
+    const today = new Date();
+    let active = 0;
+    let expired = 0;
+    
+    configs.forEach(config => {
+      if (!config.expiration_date) {
+        active++;
+      } else {
+        try {
+          const expDate = new Date(config.expiration_date);
+          if (expDate > today) {
+            active++;
+          } else {
+            expired++;
+          }
+        } catch (e) {
+          // If date parsing fails, treat as active
+          active++;
+        }
+      }
+    });
+    
+    return { active, expired };
+  };
+
+  const businessStats = calculateStats(businessConfigsSafe);
+  const capitalStats = calculateStats(capitalConfigsSafe);
+  const regulatoryStats = calculateStats(regulatoryConfigsSafe);
+  const penaltyStats = calculateStats(penaltyConfigsSafe);
+  const discountStats = calculateStats(discountConfigsSafe);
+
+  // Function to refresh current tab data
+  const refreshCurrentTab = async () => {
+    setLoading(true);
+    try {
+      switch (activeTab) {
+        case 'business':
+          await fetchBusinessConfigs();
+          break;
+        case 'capital':
+          await fetchCapitalConfigs();
+          break;
+        case 'regulatory':
+          await fetchRegulatoryConfigs();
+          break;
+        case 'penalty':
+          await fetchPenaltyConfigs();
+          break;
+        case 'discount':
+          await fetchDiscountConfigs();
+          break;
+        default:
+          await fetchAllConfigs();
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      setError('Failed to refresh data: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Debug: Check what data we have
+  useEffect(() => {
+    console.log('Business Configs (JSON):', businessConfigsSafe);
+    console.log('Capital Configs (JSON):', capitalConfigsSafe);
+    console.log('Regulatory Configs (JSON):', regulatoryConfigsSafe);
+    console.log('Penalty Configs (JSON):', penaltyConfigsSafe);
+    console.log('Discount Configs (JSON):', discountConfigsSafe);
+  }, [businessConfigs, capitalConfigs, regulatoryConfigs, penaltyConfigs, discountConfigs]);
 
   return (
     <div className='mx-1 mt-1 p-6 dark:bg-slate-900 bg-white dark:text-slate-300 rounded-lg'>
-      <h1 className="text-2xl font-bold mb-6">Business Tax Configuration</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Business Tax Configuration</h1>
+        <button
+          onClick={refreshCurrentTab}
+          disabled={loading || submitting}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Refreshing...' : 'Refresh Data'}
+        </button>
+      </div>
       
+      {/* Success Message */}
+      {successMessage && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="text-green-600 font-medium">Success:</div>
+            <div className="ml-2 text-green-700">{successMessage}</div>
+            <button 
+              onClick={() => setSuccessMessage(null)}
+              className="ml-auto text-green-600 hover:text-green-800"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -566,12 +856,20 @@ export default function BUSINESS1() {
       {/* Date Filter */}
       <div className="mb-6 p-4 border rounded-lg dark:border-slate-700">
         <label className="block text-sm font-medium mb-2">View Configurations Effective On:</label>
-        <input
-          type="date"
-          value={currentDate}
-          onChange={(e) => setCurrentDate(e.target.value)}
-          className="p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-        />
+        <div className="flex items-center gap-4">
+          <input
+            type="date"
+            value={currentDate}
+            onChange={(e) => setCurrentDate(e.target.value)}
+            className="p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+          />
+          <button
+            onClick={() => setCurrentDate(new Date().toISOString().split('T')[0])}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Today
+          </button>
+        </div>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
           Showing configurations effective on or before {currentDate}
         </p>
@@ -581,28 +879,28 @@ export default function BUSINESS1() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-blue-800 dark:text-blue-300">Gross Sales Tax</h3>
-          <p className="text-2xl font-bold">{businessConfigs.length}</p>
-          <p className="text-sm">Active: {activeBusinessConfigs} | Expired: {expiredBusinessConfigs}</p>
+          <p className="text-2xl font-bold">{businessConfigsSafe.length}</p>
+          <p className="text-sm">Active: {businessStats.active} | Expired: {businessStats.expired}</p>
         </div>
         <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-indigo-800 dark:text-indigo-300">Capital Investment Tax</h3>
-          <p className="text-2xl font-bold">{capitalConfigs.length}</p>
-          <p className="text-sm">Active: {activeCapitalConfigs} | Expired: {expiredCapitalConfigs}</p>
+          <p className="text-2xl font-bold">{capitalConfigsSafe.length}</p>
+          <p className="text-sm">Active: {capitalStats.active} | Expired: {capitalStats.expired}</p>
         </div>
         <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-green-800 dark:text-green-300">Regulatory Fees</h3>
-          <p className="text-2xl font-bold">{regulatoryConfigs.length}</p>
-          <p className="text-sm">Active: {activeRegulatoryConfigs} | Expired: {expiredRegulatoryConfigs}</p>
+          <p className="text-2xl font-bold">{regulatoryConfigsSafe.length}</p>
+          <p className="text-sm">Active: {regulatoryStats.active} | Expired: {regulatoryStats.expired}</p>
         </div>
         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-red-800 dark:text-red-300">Penalties</h3>
-          <p className="text-2xl font-bold">{penaltyConfigs.length}</p>
-          <p className="text-sm">Active: {activePenaltyConfigs} | Expired: {expiredPenaltyConfigs}</p>
+          <p className="text-2xl font-bold">{penaltyConfigsSafe.length}</p>
+          <p className="text-sm">Active: {penaltyStats.active} | Expired: {penaltyStats.expired}</p>
         </div>
         <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
           <h3 className="font-semibold text-purple-800 dark:text-purple-300">Discounts</h3>
-          <p className="text-2xl font-bold">{discountConfigs.length}</p>
-          <p className="text-sm">Active: {activeDiscountConfigs} | Expired: {expiredDiscountConfigs}</p>
+          <p className="text-2xl font-bold">{discountConfigsSafe.length}</p>
+          <p className="text-sm">Active: {discountStats.active} | Expired: {discountStats.expired}</p>
         </div>
       </div>
 
@@ -632,6 +930,7 @@ export default function BUSINESS1() {
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="e.g., Retailer, Wholesaler, Service Provider"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -642,11 +941,12 @@ export default function BUSINESS1() {
                   step="0.01"
                   min="0"
                   max="100"
-                  value={businessForm.tax_rate}
-                  onChange={(e) => setBusinessForm({...businessForm, tax_rate: e.target.value})}
+                  value={businessForm.tax_percent}
+                  onChange={(e) => setBusinessForm({...businessForm, tax_percent: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="e.g., 2.00 for 2%"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -658,6 +958,7 @@ export default function BUSINESS1() {
                   onChange={(e) => setBusinessForm({...businessForm, effective_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -668,6 +969,7 @@ export default function BUSINESS1() {
                   value={businessForm.expiration_date}
                   onChange={(e) => setBusinessForm({...businessForm, expiration_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  disabled={submitting}
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
               </div>
@@ -680,11 +982,12 @@ export default function BUSINESS1() {
                   rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional notes about this business tax configuration..."
+                  disabled={submitting}
                 />
               </div>
 
               {/* Tax Preview */}
-              {businessForm.tax_rate && (
+              {businessForm.tax_percent && (
                 <div className="md:col-span-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <h4 className="font-medium mb-2">Tax Calculation Preview</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -694,11 +997,11 @@ export default function BUSINESS1() {
                     </div>
                     <div>
                       <span className="font-medium">Tax Rate:</span>
-                      <div className="text-lg">{businessForm.tax_rate}%</div>
+                      <div className="text-lg">{businessForm.tax_percent}%</div>
                     </div>
                   </div>
                   <p className="text-sm mt-2">
-                    Example: For ₱100,000 gross sales = ₱{(100000 * (parseFloat(businessForm.tax_rate || 0) / 100)).toFixed(2)}
+                    Example: For ₱100,000 gross sales = ₱{(100000 * (parseFloat(businessForm.tax_percent || 0) / 100)).toFixed(2)}
                   </p>
                 </div>
               )}
@@ -707,14 +1010,16 @@ export default function BUSINESS1() {
               <div className="md:col-span-2 flex gap-4 mt-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                  disabled={submitting}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingType === 'business' ? 'Update Gross Sales Tax' : 'Create Gross Sales Tax'}
+                  {submitting ? 'Saving...' : editingType === 'business' ? 'Update Gross Sales Tax' : 'Create Gross Sales Tax'}
                 </button>
                 <button
                   type="button"
                   onClick={resetBusinessForm}
-                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                  disabled={submitting}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -725,10 +1030,10 @@ export default function BUSINESS1() {
           {/* Business Configurations List */}
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              Gross Sales Tax Rates ({businessConfigs.length})
+              Gross Sales Tax Rates ({businessConfigsSafe.length})
             </h2>
             
-            {businessConfigs.length === 0 ? (
+            {businessConfigsSafe.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No gross sales tax rates found for the selected date.
               </div>
@@ -746,7 +1051,7 @@ export default function BUSINESS1() {
                     </tr>
                   </thead>
                   <tbody>
-                    {businessConfigs.map((config) => {
+                    {businessConfigsSafe.map((config) => {
                       const isExpired = config.expiration_date && new Date(config.expiration_date) <= new Date();
                       return (
                         <tr 
@@ -763,7 +1068,7 @@ export default function BUSINESS1() {
                               </div>
                             )}
                           </td>
-                          <td className="border p-2">{config.tax_rate}%</td>
+                          <td className="border p-2">{config.tax_percent}%</td>
                           <td className="border p-2">{config.effective_date}</td>
                           <td className="border p-2">{config.expiration_date || '-'}</td>
                           <td className="border p-2">
@@ -780,7 +1085,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleBusinessEdit(config)}
                                 className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
-                                disabled={isExpired}
+                                disabled={isExpired || submitting}
                               >
                                 Edit
                               </button>
@@ -788,6 +1093,7 @@ export default function BUSINESS1() {
                                 <button
                                   onClick={() => handleExpire(config.id, 'business')}
                                   className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                                  disabled={submitting}
                                 >
                                   Expire
                                 </button>
@@ -795,6 +1101,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleDelete(config.id, 'business')}
                                 className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                                disabled={submitting}
                               >
                                 Delete
                               </button>
@@ -826,11 +1133,12 @@ export default function BUSINESS1() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={capitalForm.min_capital}
-                  onChange={(e) => setCapitalForm({...capitalForm, min_capital: e.target.value})}
+                  value={capitalForm.min_amount}
+                  onChange={(e) => setCapitalForm({...capitalForm, min_amount: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="e.g., 0.00"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -840,11 +1148,12 @@ export default function BUSINESS1() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={capitalForm.max_capital}
-                  onChange={(e) => setCapitalForm({...capitalForm, max_capital: e.target.value})}
+                  value={capitalForm.max_amount}
+                  onChange={(e) => setCapitalForm({...capitalForm, max_amount: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="e.g., 5000.00"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -860,6 +1169,7 @@ export default function BUSINESS1() {
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="e.g., 0.25 for 0.25%"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -871,6 +1181,7 @@ export default function BUSINESS1() {
                   onChange={(e) => setCapitalForm({...capitalForm, effective_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -881,6 +1192,7 @@ export default function BUSINESS1() {
                   value={capitalForm.expiration_date}
                   onChange={(e) => setCapitalForm({...capitalForm, expiration_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  disabled={submitting}
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
               </div>
@@ -893,17 +1205,18 @@ export default function BUSINESS1() {
                   rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional notes about this capital investment tax..."
+                  disabled={submitting}
                 />
               </div>
 
               {/* Tax Calculation Preview */}
-              {capitalForm.min_capital && capitalForm.max_capital && capitalForm.tax_percent && (
+              {capitalForm.min_amount && capitalForm.max_amount && capitalForm.tax_percent && (
                 <div className="md:col-span-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
                   <h4 className="font-medium mb-2">Tax Calculation Preview</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div>
                       <span className="font-medium">Capital Range:</span>
-                      <div className="text-lg">₱{parseFloat(capitalForm.min_capital).toLocaleString()} - ₱{parseFloat(capitalForm.max_capital).toLocaleString()}</div>
+                      <div className="text-lg">₱{parseFloat(capitalForm.min_amount).toLocaleString()} - ₱{parseFloat(capitalForm.max_amount).toLocaleString()}</div>
                     </div>
                     <div>
                       <span className="font-medium">Tax Rate:</span>
@@ -912,7 +1225,7 @@ export default function BUSINESS1() {
                     <div>
                       <span className="font-medium">Example Tax:</span>
                       <div className="text-lg">
-                        ₱{parseFloat(capitalForm.max_capital).toLocaleString()} capital × {capitalForm.tax_percent}% = ₱{(parseFloat(capitalForm.max_capital) * (parseFloat(capitalForm.tax_percent) / 100)).toFixed(2)}
+                        ₱{parseFloat(capitalForm.max_amount).toLocaleString()} capital × {capitalForm.tax_percent}% = ₱{(parseFloat(capitalForm.max_amount) * (parseFloat(capitalForm.tax_percent) / 100)).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -923,14 +1236,16 @@ export default function BUSINESS1() {
               <div className="md:col-span-3 flex gap-4 mt-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                  disabled={submitting}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingType === 'capital' ? 'Update Capital Tax' : 'Create Capital Tax'}
+                  {submitting ? 'Saving...' : editingType === 'capital' ? 'Update Capital Tax' : 'Create Capital Tax'}
                 </button>
                 <button
                   type="button"
                   onClick={resetCapitalForm}
-                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                  disabled={submitting}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -941,10 +1256,10 @@ export default function BUSINESS1() {
           {/* Capital Investment Tax List */}
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              Capital Investment Tax Brackets ({capitalConfigs.length})
+              Capital Investment Tax Brackets ({capitalConfigsSafe.length})
             </h2>
             
-            {capitalConfigs.length === 0 ? (
+            {capitalConfigsSafe.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No capital investment tax brackets found for the selected date.
               </div>
@@ -962,7 +1277,7 @@ export default function BUSINESS1() {
                     </tr>
                   </thead>
                   <tbody>
-                    {capitalConfigs.map((config) => {
+                    {capitalConfigsSafe.map((config) => {
                       const isExpired = config.expiration_date && new Date(config.expiration_date) <= new Date();
                       return (
                         <tr 
@@ -973,7 +1288,7 @@ export default function BUSINESS1() {
                         >
                           <td className="border p-2">
                             <div className="font-medium">
-                              ₱{parseFloat(config.min_capital).toLocaleString()} - ₱{parseFloat(config.max_capital).toLocaleString()}
+                              ₱{parseFloat(config.min_amount || 0).toLocaleString()} - ₱{parseFloat(config.max_amount || 0).toLocaleString()}
                             </div>
                             {config.remarks && (
                               <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -998,7 +1313,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleCapitalEdit(config)}
                                 className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
-                                disabled={isExpired}
+                                disabled={isExpired || submitting}
                               >
                                 Edit
                               </button>
@@ -1006,6 +1321,7 @@ export default function BUSINESS1() {
                                 <button
                                   onClick={() => handleExpire(config.id, 'capital')}
                                   className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                                  disabled={submitting}
                                 >
                                   Expire
                                 </button>
@@ -1013,6 +1329,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleDelete(config.id, 'capital')}
                                 className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                                disabled={submitting}
                               >
                                 Delete
                               </button>
@@ -1029,7 +1346,7 @@ export default function BUSINESS1() {
         </>
       )}
 
-      {/* Regulatory Configuration Tab (Same as before) */}
+      {/* Regulatory Configuration Tab */}
       {activeTab === 'regulatory' && !loading && (
         <>
           {/* Regulatory Configuration Form */}
@@ -1045,25 +1362,14 @@ export default function BUSINESS1() {
                   value={regulatoryForm.fee_name}
                   onChange={(e) => setRegulatoryForm({...regulatoryForm, fee_name: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="e.g., Mayor's Permit Fee, Sanitary Fee, Signage Fee"
+                  placeholder="e.g., Mayor Permit Fee, Sanitary Fee, Registration Fee"
                   required
+                  disabled={submitting}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Business Type</label>
-                <input
-                  type="text"
-                  value={regulatoryForm.business_type}
-                  onChange={(e) => setRegulatoryForm({...regulatoryForm, business_type: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
-                  placeholder="e.g., All, Food Establishment, Retail Store"
-                />
-                <p className="text-xs text-gray-500 mt-1">Leave empty if applicable to all businesses</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Amount *</label>
+                <label className="block text-sm font-medium mb-2">Amount (₱) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1073,6 +1379,7 @@ export default function BUSINESS1() {
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="0.00"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -1084,6 +1391,7 @@ export default function BUSINESS1() {
                   onChange={(e) => setRegulatoryForm({...regulatoryForm, effective_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -1094,6 +1402,7 @@ export default function BUSINESS1() {
                   value={regulatoryForm.expiration_date}
                   onChange={(e) => setRegulatoryForm({...regulatoryForm, expiration_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  disabled={submitting}
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
               </div>
@@ -1106,6 +1415,7 @@ export default function BUSINESS1() {
                   rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional details about this regulatory fee..."
+                  disabled={submitting}
                 />
               </div>
 
@@ -1113,14 +1423,16 @@ export default function BUSINESS1() {
               <div className="md:col-span-2 flex gap-4 mt-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                  disabled={submitting}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingType === 'regulatory' ? 'Update Regulatory Fee' : 'Create Regulatory Fee'}
+                  {submitting ? 'Saving...' : editingType === 'regulatory' ? 'Update Regulatory Fee' : 'Create Regulatory Fee'}
                 </button>
                 <button
                   type="button"
                   onClick={resetRegulatoryForm}
-                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                  disabled={submitting}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1131,10 +1443,10 @@ export default function BUSINESS1() {
           {/* Regulatory Configurations List */}
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              Regulatory Fee Configurations ({regulatoryConfigs.length})
+              Regulatory Fee Configurations ({regulatoryConfigsSafe.length})
             </h2>
             
-            {regulatoryConfigs.length === 0 ? (
+            {regulatoryConfigsSafe.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No regulatory fee configurations found for the selected date.
               </div>
@@ -1144,7 +1456,6 @@ export default function BUSINESS1() {
                   <thead>
                     <tr className="bg-gray-100 dark:bg-slate-800">
                       <th className="border p-2 text-left">Fee Name</th>
-                      <th className="border p-2 text-left">Business Type</th>
                       <th className="border p-2 text-left">Amount</th>
                       <th className="border p-2 text-left">Effective Date</th>
                       <th className="border p-2 text-left">Expiration Date</th>
@@ -1153,8 +1464,9 @@ export default function BUSINESS1() {
                     </tr>
                   </thead>
                   <tbody>
-                    {regulatoryConfigs.map((config) => {
+                    {regulatoryConfigsSafe.map((config) => {
                       const isExpired = config.expiration_date && new Date(config.expiration_date) <= new Date();
+                      
                       return (
                         <tr 
                           key={config.id} 
@@ -1170,8 +1482,7 @@ export default function BUSINESS1() {
                               </div>
                             )}
                           </td>
-                          <td className="border p-2">{config.business_type || 'All'}</td>
-                          <td className="border p-2">₱{parseFloat(config.amount).toLocaleString()}</td>
+                          <td className="border p-2">₱{parseFloat(config.amount || 0).toLocaleString()}</td>
                           <td className="border p-2">{config.effective_date}</td>
                           <td className="border p-2">{config.expiration_date || '-'}</td>
                           <td className="border p-2">
@@ -1188,7 +1499,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleRegulatoryEdit(config)}
                                 className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
-                                disabled={isExpired}
+                                disabled={isExpired || submitting}
                               >
                                 Edit
                               </button>
@@ -1196,6 +1507,7 @@ export default function BUSINESS1() {
                                 <button
                                   onClick={() => handleExpire(config.id, 'regulatory')}
                                   className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                                  disabled={submitting}
                                 >
                                   Expire
                                 </button>
@@ -1203,6 +1515,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleDelete(config.id, 'regulatory')}
                                 className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                                disabled={submitting}
                               >
                                 Delete
                               </button>
@@ -1219,7 +1532,7 @@ export default function BUSINESS1() {
         </>
       )}
 
-      {/* Penalty Configuration Tab (Same as before) */}
+      {/* Penalty Configuration Tab */}
       {activeTab === 'penalty' && !loading && (
         <>
           {/* Penalty Configuration Form */}
@@ -1240,6 +1553,7 @@ export default function BUSINESS1() {
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="0.00"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -1251,6 +1565,7 @@ export default function BUSINESS1() {
                   onChange={(e) => setPenaltyForm({...penaltyForm, effective_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -1261,6 +1576,7 @@ export default function BUSINESS1() {
                   value={penaltyForm.expiration_date}
                   onChange={(e) => setPenaltyForm({...penaltyForm, expiration_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  disabled={submitting}
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
               </div>
@@ -1273,6 +1589,7 @@ export default function BUSINESS1() {
                   rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional details about this penalty..."
+                  disabled={submitting}
                 />
               </div>
 
@@ -1280,14 +1597,16 @@ export default function BUSINESS1() {
               <div className="md:col-span-2 flex gap-4 mt-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                  disabled={submitting}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingType === 'penalty' ? 'Update Penalty' : 'Create Penalty'}
+                  {submitting ? 'Saving...' : editingType === 'penalty' ? 'Update Penalty' : 'Create Penalty'}
                 </button>
                 <button
                   type="button"
                   onClick={resetPenaltyForm}
-                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                  disabled={submitting}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1298,10 +1617,10 @@ export default function BUSINESS1() {
           {/* Penalty Configurations List */}
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              Penalty Configurations ({penaltyConfigs.length})
+              Penalty Configurations ({penaltyConfigsSafe.length})
             </h2>
             
-            {penaltyConfigs.length === 0 ? (
+            {penaltyConfigsSafe.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No penalty configurations found for the selected date.
               </div>
@@ -1318,7 +1637,7 @@ export default function BUSINESS1() {
                     </tr>
                   </thead>
                   <tbody>
-                    {penaltyConfigs.map((config) => {
+                    {penaltyConfigsSafe.map((config) => {
                       const isExpired = config.expiration_date && new Date(config.expiration_date) <= new Date();
                       return (
                         <tr 
@@ -1351,7 +1670,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handlePenaltyEdit(config)}
                                 className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
-                                disabled={isExpired}
+                                disabled={isExpired || submitting}
                               >
                                 Edit
                               </button>
@@ -1359,6 +1678,7 @@ export default function BUSINESS1() {
                                 <button
                                   onClick={() => handleExpire(config.id, 'penalty')}
                                   className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                                  disabled={submitting}
                                 >
                                   Expire
                                 </button>
@@ -1366,6 +1686,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleDelete(config.id, 'penalty')}
                                 className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                                disabled={submitting}
                               >
                                 Delete
                               </button>
@@ -1382,7 +1703,7 @@ export default function BUSINESS1() {
         </>
       )}
 
-      {/* Discount Configuration Tab (Same as before) */}
+      {/* Discount Configuration Tab */}
       {activeTab === 'discount' && !loading && (
         <>
           {/* Discount Configuration Form */}
@@ -1403,6 +1724,7 @@ export default function BUSINESS1() {
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="0.00"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -1414,6 +1736,7 @@ export default function BUSINESS1() {
                   onChange={(e) => setDiscountForm({...discountForm, effective_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -1424,6 +1747,7 @@ export default function BUSINESS1() {
                   value={discountForm.expiration_date}
                   onChange={(e) => setDiscountForm({...discountForm, expiration_date: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
+                  disabled={submitting}
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave empty if no expiration</p>
               </div>
@@ -1436,6 +1760,7 @@ export default function BUSINESS1() {
                   rows="2"
                   className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600"
                   placeholder="Additional details about this discount..."
+                  disabled={submitting}
                 />
               </div>
 
@@ -1443,14 +1768,16 @@ export default function BUSINESS1() {
               <div className="md:col-span-2 flex gap-4 mt-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                  disabled={submitting}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingType === 'discount' ? 'Update Discount' : 'Create Discount'}
+                  {submitting ? 'Saving...' : editingType === 'discount' ? 'Update Discount' : 'Create Discount'}
                 </button>
                 <button
                   type="button"
                   onClick={resetDiscountForm}
-                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors"
+                  disabled={submitting}
+                  className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1461,10 +1788,10 @@ export default function BUSINESS1() {
           {/* Discount Configurations List */}
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              Discount Configurations ({discountConfigs.length})
+              Discount Configurations ({discountConfigsSafe.length})
             </h2>
             
-            {discountConfigs.length === 0 ? (
+            {discountConfigsSafe.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No discount configurations found for the selected date.
               </div>
@@ -1481,7 +1808,7 @@ export default function BUSINESS1() {
                     </tr>
                   </thead>
                   <tbody>
-                    {discountConfigs.map((config) => {
+                    {discountConfigsSafe.map((config) => {
                       const isExpired = config.expiration_date && new Date(config.expiration_date) <= new Date();
                       return (
                         <tr 
@@ -1514,7 +1841,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleDiscountEdit(config)}
                                 className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
-                                disabled={isExpired}
+                                disabled={isExpired || submitting}
                               >
                                 Edit
                               </button>
@@ -1522,6 +1849,7 @@ export default function BUSINESS1() {
                                 <button
                                   onClick={() => handleExpire(config.id, 'discount')}
                                   className="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600 transition-colors"
+                                  disabled={submitting}
                                 >
                                   Expire
                                 </button>
@@ -1529,6 +1857,7 @@ export default function BUSINESS1() {
                               <button
                                 onClick={() => handleDelete(config.id, 'discount')}
                                 className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                                disabled={submitting}
                               >
                                 Delete
                               </button>

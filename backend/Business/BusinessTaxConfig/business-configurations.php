@@ -1,9 +1,8 @@
 <?php
 // Enable CORS with proper headers
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json");
 
 // Handle preflight OPTIONS request
@@ -15,225 +14,226 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 // Include database connection
 require_once '../../../db/Business/business_db.php';
 
-$method = $_SERVER['REQUEST_METHOD'];
-
-switch ($method) {
-    case 'GET':
-        getBusinessConfigurations();
-        break;
-    case 'POST':
-        createBusinessConfiguration();
-        break;
-    case 'PUT':
-        updateBusinessConfiguration();
-        break;
-    case 'PATCH':
-        patchBusinessConfiguration();
-        break;
-    case 'DELETE':
-        deleteBusinessConfiguration();
-        break;
-    default:
-        http_response_code(405);
-        echo json_encode(["error" => "Method not allowed"]);
+// Helper function for consistent responses
+function jsonResponse($success, $message = '', $data = null, $statusCode = 200) {
+    http_response_code($statusCode);
+    echo json_encode([
+        'success' => $success,
+        'message' => $message,
+        'data' => $data
+    ], JSON_PRETTY_PRINT);
+    exit();
 }
 
-function getBusinessConfigurations() {
-    global $pdo;
+// Get current date from query or use today
+$currentDate = isset($_GET['current_date']) ? $_GET['current_date'] : date('Y-m-d');
+
+try {
+    $method = $_SERVER['REQUEST_METHOD'];
     
-    $currentDate = isset($_GET['current_date']) ? $_GET['current_date'] : date('Y-m-d');
+    switch ($method) {
+        case 'GET':
+            handleGet();
+            break;
+        case 'POST':
+            handlePost();
+            break;
+        case 'PUT':
+            handlePut();
+            break;
+        case 'DELETE':
+            handleDelete();
+            break;
+        case 'PATCH':
+            handlePatch();
+            break;
+        default:
+            jsonResponse(false, 'Method not allowed', null, 405);
+    }
     
-    try {
+} catch (Exception $e) {
+    jsonResponse(false, 'Server error: ' . $e->getMessage(), null, 500);
+}
+
+function handleGet() {
+    global $pdo, $currentDate;
+    
+    $id = isset($_GET['id']) ? intval($_GET['id']) : null;
+    
+    if ($id) {
+        // Get single configuration
+        $stmt = $pdo->prepare("SELECT * FROM gross_sales_tax_config WHERE id = ?");
+        $stmt->execute([$id]);
+        $config = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($config) {
+            jsonResponse(true, 'Configuration retrieved', $config);
+        } else {
+            jsonResponse(false, 'Configuration not found', null, 404);
+        }
+    } else {
+        // FIXED: Get all configurations - handle NULL, empty, and '0000-00-00' dates
         $stmt = $pdo->prepare("
-            SELECT * FROM business_tax_rate_config 
+            SELECT * FROM gross_sales_tax_config 
             WHERE effective_date <= ? 
-            AND (expiration_date IS NULL OR expiration_date >= ?)
-            ORDER BY business_type, effective_date
+            AND (
+                expiration_date IS NULL 
+                OR expiration_date = '' 
+                OR expiration_date = '0000-00-00' 
+                OR expiration_date = '0000-00-00 00:00:00'
+                OR expiration_date >= ?
+            )
+            ORDER BY business_type, effective_date DESC
         ");
         $stmt->execute([$currentDate, $currentDate]);
-        $configurations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $configs = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        echo json_encode($configurations);
+        // Debug: Log the count
+        error_log("Fetched " . count($configs) . " business configurations for date: $currentDate");
         
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Database error: " . $e->getMessage()]);
+        jsonResponse(true, 'Business configurations retrieved', $configs);
     }
 }
 
-function createBusinessConfiguration() {
+function handlePost() {
     global $pdo;
     
     $input = json_decode(file_get_contents('php://input'), true);
     
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(["error" => "Invalid JSON data"]);
-        return;
+    if (!$input) {
+        jsonResponse(false, 'Invalid JSON data', null, 400);
     }
     
-    // Validate required fields based on actual database schema
-    $required = ['business_type', 'tax_rate', 'effective_date'];
+    // Validate required fields
+    $required = ['business_type', 'tax_percent', 'effective_date'];
     foreach ($required as $field) {
-        if (!isset($input[$field])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Missing required field: $field"]);
-            return;
+        if (!isset($input[$field]) || empty(trim($input[$field]))) {
+            jsonResponse(false, "Missing required field: $field", null, 400);
         }
+    }
+    
+    // Convert empty expiration_date to NULL
+    if (isset($input['expiration_date']) && (empty($input['expiration_date']) || $input['expiration_date'] == '0000-00-00')) {
+        $input['expiration_date'] = null;
     }
     
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO business_tax_rate_config (
-                business_type, tax_rate, effective_date, expiration_date, remarks
-            ) VALUES (?, ?, ?, ?, ?)
+            INSERT INTO gross_sales_tax_config 
+            (business_type, tax_percent, effective_date, expiration_date, remarks, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
         $stmt->execute([
             $input['business_type'],
-            $input['tax_rate'],
+            $input['tax_percent'],
             $input['effective_date'],
-            !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            !empty($input['remarks']) ? $input['remarks'] : null
+            $input['expiration_date'] ?? null,
+            $input['remarks'] ?? null
         ]);
         
-        echo json_encode([
-            "message" => "Business configuration created successfully", 
-            "id" => $pdo->lastInsertId()
-        ]);
+        $id = $pdo->lastInsertId();
+        jsonResponse(true, 'Business configuration created successfully', ['id' => $id]);
         
     } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to create business configuration: " . $e->getMessage()]);
+        jsonResponse(false, 'Database error: ' . $e->getMessage(), null, 500);
     }
 }
 
-function updateBusinessConfiguration() {
+function handlePut() {
     global $pdo;
     
-    $id = $_GET['id'] ?? null;
+    $id = isset($_GET['id']) ? intval($_GET['id']) : null;
     if (!$id) {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID parameter"]);
-        return;
+        jsonResponse(false, 'Configuration ID is required', null, 400);
     }
     
     $input = json_decode(file_get_contents('php://input'), true);
+    if (!$input) {
+        jsonResponse(false, 'Invalid JSON data', null, 400);
+    }
     
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(["error" => "Invalid JSON data"]);
-        return;
+    // Convert empty expiration_date to NULL
+    if (isset($input['expiration_date']) && (empty($input['expiration_date']) || $input['expiration_date'] == '0000-00-00')) {
+        $input['expiration_date'] = null;
     }
     
     try {
-        $stmt = $pdo->prepare("
-            UPDATE business_tax_rate_config SET 
-                business_type = ?, tax_rate = ?, 
-                effective_date = ?, expiration_date = ?, remarks = ?
-            WHERE id = ?
-        ");
+        // Build dynamic update query
+        $fields = [];
+        $values = [];
         
-        $stmt->execute([
-            $input['business_type'],
-            $input['tax_rate'],
-            $input['effective_date'],
-            !empty($input['expiration_date']) ? $input['expiration_date'] : null,
-            !empty($input['remarks']) ? $input['remarks'] : null,
-            $id
-        ]);
-        
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration updated successfully"]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
+        $allowedFields = ['business_type', 'tax_percent', 'effective_date', 'expiration_date', 'remarks'];
+        foreach ($allowedFields as $field) {
+            if (isset($input[$field])) {
+                $fields[] = "$field = ?";
+                $values[] = $input[$field];
+            }
         }
         
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to update business configuration: " . $e->getMessage()]);
-    }
-}
-
-function patchBusinessConfiguration() {
-    global $pdo;
-    
-    $id = $_GET['id'] ?? null;
-    if (!$id) {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID parameter"]);
-        return;
-    }
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(["error" => "Invalid JSON data"]);
-        return;
-    }
-    
-    $fields = [];
-    $values = [];
-    
-    // Only allow fields that exist in the database
-    $allowedFields = ['business_type', 'tax_rate', 'effective_date', 'expiration_date', 'remarks'];
-    foreach ($allowedFields as $field) {
-        if (isset($input[$field])) {
-            $fields[] = "$field = ?";
-            $values[] = $input[$field];
+        if (empty($fields)) {
+            jsonResponse(false, 'No fields to update', null, 400);
         }
-    }
-    
-    if (empty($fields)) {
-        http_response_code(400);
-        echo json_encode(["error" => "No valid fields to update"]);
-        return;
-    }
-    
-    $values[] = $id;
-    $sql = "UPDATE business_tax_rate_config SET " . implode(', ', $fields) . " WHERE id = ?";
-    
-    try {
+        
+        $fields[] = "updated_at = NOW()";
+        $values[] = $id;
+        
+        $sql = "UPDATE gross_sales_tax_config SET " . implode(', ', $fields) . " WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($values);
         
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration updated successfully"]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
-        }
+        jsonResponse(true, 'Business configuration updated successfully');
+        
     } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to update business configuration: " . $e->getMessage()]);
+        jsonResponse(false, 'Database error: ' . $e->getMessage(), null, 500);
     }
 }
 
-function deleteBusinessConfiguration() {
+function handleDelete() {
     global $pdo;
     
-    $id = $_GET['id'] ?? null;
+    $id = isset($_GET['id']) ? intval($_GET['id']) : null;
     if (!$id) {
-        http_response_code(400);
-        echo json_encode(["error" => "Missing ID parameter"]);
-        return;
+        jsonResponse(false, 'Configuration ID is required', null, 400);
     }
     
     try {
-        $stmt = $pdo->prepare("DELETE FROM business_tax_rate_config WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM gross_sales_tax_config WHERE id = ?");
         $stmt->execute([$id]);
         
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["message" => "Business configuration deleted successfully"]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["error" => "Business configuration not found"]);
-        }
+        jsonResponse(true, 'Business configuration deleted successfully');
+        
     } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["error" => "Failed to delete business configuration: " . $e->getMessage()]);
+        jsonResponse(false, 'Database error: ' . $e->getMessage(), null, 500);
     }
 }
-?>
+
+function handlePatch() {
+    global $pdo;
+    
+    $id = isset($_GET['id']) ? intval($_GET['id']) : null;
+    if (!$id) {
+        jsonResponse(false, 'Configuration ID is required', null, 400);
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!$input) {
+        jsonResponse(false, 'Invalid JSON data', null, 400);
+    }
+    
+    $expirationDate = $input['expiration_date'] ?? date('Y-m-d');
+    
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE gross_sales_tax_config 
+            SET expiration_date = ?, updated_at = NOW() 
+            WHERE id = ?
+        ");
+        $stmt->execute([$expirationDate, $id]);
+        
+        jsonResponse(true, 'Business configuration expired successfully');
+        
+    } catch (PDOException $e) {
+        jsonResponse(false, 'Database error: ' . $e->getMessage(), null, 500);
+    }
+}
